@@ -1,61 +1,61 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+// Solmar — kota pesisir orisinal. Semua konstanta dunia & gameplay di satu tempat
+// agar tuning tidak tersebar. Bukan tiruan kota, nama, atau aset game komersial apa pun.
+export const CFG = {
+  // Dunia: grid kota 5x5 blok, jalan tiap 40 unit, lebar jalan 10.
+  block: 40, road: 10, cityHalf: 110,
+  // Pelabuhan di selatan (z positif), pantai di timur (x positif).
+  portZ: 150, beachX: 150, highwayR: 165,
+  // Pemain jalan kaki.
+  walkSpeed: 7, runSpeed: 12, punchRange: 2.4, punchDamage: 34, punchCooldown: 0.45,
+  // Mobil.
+  carAccel: 22, carBrake: 34, carMaxSpeed: 38, carMaxReverse: 10, carSteer: 1.9,
+  carEnterRange: 4.5,
+  // Wanted 1-5. Naik saat mencuri (+1), menabrak pejalan kaki (+2), memukul di
+  // depan polisi (+1). Turun setelah 18 detik tanpa kejahatan.
+  wantedDecay: 18, maxWanted: 5,
+  // Polisi.
+  policeCarSpeed: 30, policeShootRange: 42, policeShotDamage: 7, bustedTime: 2.2,
+  // Misi & uang.
+  missionRewards: [150, 200, 250, 500],
+  startCash: 50, startHealth: 100,
+  // Kamera.
+  camDist: 9, camHeight: 4.2,
+  // Warna kota (palet hangat pesisir, siang terik).
+  palette: [0xe8b04b, 0xd97b4f, 0x7fb3d5, 0xf2e3c6, 0xc96f5a, 0x8fae8b, 0xe0a458, 0x5d8aa8],
+  carColors: [0xc0392b, 0x2e86c1, 0xf1c40f, 0x27ae60, 0x8e44ad, 0xe67e22, 0xecf0f1, 0x2c3e50],
+  // Nama jalan & toko orisinal Solmar.
+  streets: ['Av. del Faro', 'Calle Coral', 'Paseo Brisa', 'Rua do Porto', 'Av. Palma', 'Calle Marea'],
+  shops: ['Café Brisa', 'Toko Pancing Nelayan', 'Bengkel Ombak', 'Pasar Ikan Solmar', 'Kios Koran Pelita', 'Warung Senja'],
 };
 
-export const LIVES = 3;
+// Misi berurutan — cerita orisinal Rio, kurir pelabuhan yang berutang pada fixer "Madame Kestrel".
+export const MISSIONS = [
+  {
+    id: 'paket', title: 'Misi 1 — Paket Pelabuhan',
+    brief: 'Madame Kestrel: "Antar paket ini ke gudang pelabuhan. Jangan dibuka."',
+    target: [0, 0, 148], radius: 6, reward: 150,
+    hint: 'Ikuti penanda kuning ke pelabuhan di selatan.',
+  },
+  {
+    id: 'curian', title: 'Misi 2 — Mobil Curian',
+    brief: 'Kestrel: "Butuh mobil cepat. Curi satu, bawa ke garasi Ombak. Polisi? Itu urusanmu."',
+    target: [-84, 0, -84], radius: 7, reward: 200, needCar: true, needSteal: true,
+    hint: 'Tekan E di dekat mobil untuk mencuri. Wanted naik — kabur ke garasi barat laut.',
+  },
+  {
+    id: 'jemput', title: 'Misi 3 — Jemputan Boulevard',
+    brief: 'Kestrel: "Jemput Sari di boulevard pantai. Dia membawa kunci brankas. Jangan telat."',
+    target: [138, 0, 20], radius: 6, reward: 250,
+    hint: 'Sari menunggu di boulevard timur, dekat pantai.',
+  },
+  {
+    id: 'getaway', title: 'Misi 4 — Getaway Terakhir',
+    brief: 'Kestrel: "Polisi sudah mengepung. Bawa Sari ke checkpoint highway. Ini jalan keluar kita."',
+    target: [0, 0, -168], radius: 8, reward: 500, wantPolice: true,
+    hint: 'Tembus highway utara. Polisi mengejar — jangan berhenti.',
+  },
+];
 
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
-};
-
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
-};
-
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const STORY_INTRO =
+  'Solmar, kota pesisir yang disinari matahari. Rio, kurir pelabuhan, berutang besar ' +
+  'pada Madame Kestrel, fixer yang menguasai dermaga. Empat pekerjaan. Satu jalan keluar.';
