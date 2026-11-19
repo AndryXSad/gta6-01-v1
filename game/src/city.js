@@ -1,5 +1,7 @@
 // Kota Solmar: grid jalan, gedung low-poly bertekstur jendela prosedural,
 // pelabuhan (kontainer + crane), pantai + laut, highway lingkar, lampu & palem.
+// Prinsip layout: gedung selalu di dalam blok (di antara jalan) supaya jalan
+// tetap bersih untuk mengemudi; trotoar & garis jalan digambar di atas tanah.
 import { CFG } from './config.js';
 import { pick, range, rangeInt } from './random.js';
 

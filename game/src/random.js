@@ -1,4 +1,6 @@
 // RNG seedable (mulberry32) — layout kota & screenshot deterministik dari ?seed=.
+// Satu seed yang sama selalu membangun kota yang sama: penting untuk screenshot
+// yang bisa diulang dan untuk debugging layout.
 export function makeRng(seed) {
   let a = seed >>> 0;
   return function () {

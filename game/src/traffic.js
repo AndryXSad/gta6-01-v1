@@ -1,5 +1,6 @@
 // Traffic: mobil mengikuti loop persegi di jalan kota; pejalan kaki menyusuri
 // trotoar, kabur saat ketakutan (tabrakan / pukulan / tembakan di dekatnya).
+// Loop traffic selalu tepat di atas jalan supaya mobil tidak memotong gedung.
 import { CFG } from './config.js';
 import { pick, range } from './random.js';
 import { makeCarMesh } from './vehicles.js';

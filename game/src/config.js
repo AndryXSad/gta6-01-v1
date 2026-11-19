@@ -1,5 +1,6 @@
 // Solmar — kota pesisir orisinal. Semua konstanta dunia & gameplay di satu tempat
 // agar tuning tidak tersebar. Bukan tiruan kota, nama, atau aset game komersial apa pun.
+// Catatan tuning: kecepatan & wanted di sini yang menentukan rasa kejar-kejaran.
 export const CFG = {
   // Dunia: grid kota 5x5 blok, jalan tiap 40 unit, lebar jalan 10.
   block: 40, road: 10, cityHalf: 110,

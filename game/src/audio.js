@@ -1,5 +1,6 @@
 // Suara tersintesis WebAudio — tanpa file eksternal. Semua efek dibuat dari
 // osilator & noise buffer saat runtime. AudioContext dibuat pas gestur pertama.
+// Sirene memakai interval supaya dua nadanya bergantian seperti patroli sungguhan.
 let ctx = null, engineOsc = null, engineGain = null, sirenTimer = null, sirenOn = false;
 
 export function ensureAudio() {

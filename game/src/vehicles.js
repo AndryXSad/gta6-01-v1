@@ -1,5 +1,6 @@
 // Kendaraan: bangun mobil low-poly, parkir + NPC, masuk/keluar (E), mencuri,
 // fisika mengemudi arcade (akselerasi, belok, rem tangan, tabrakan kotak).
+// Mobil parkir selalu di tepi jalan agar pemain mudah menemukannya dari trotoar.
 import { CFG } from './config.js';
 import { pick, range } from './random.js';
 import { collideCircle } from './city.js';

@@ -1,4 +1,5 @@
 // Save/load localStorage — progresi Rio: uang, misi terbuka, health, posisi.
+// Versi kunci (v1) dijaga supaya save lama yang tidak cocok diabaikan, bukan crash.
 const KEY = 'solmar-save-v1';
 
 export function saveGame(state) {

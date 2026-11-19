@@ -1,6 +1,7 @@
 // Polisi & wanted level 1–5: mobil patroli mengejar & menabrak, petugas jalan
 // kaki mengejar & menangkap (busted), menembak di bintang ≥3. Bintang turun bila
 // lolos cukup lama tanpa kejahatan baru.
+// Jumlah patroli mengikuti bintang supaya tekanan naik bertahap, bukan mendadak.
 import { CFG } from './config.js';
 import { makeCarMesh } from './vehicles.js';
 
