@@ -1,6 +1,7 @@
 // Kota Solmar: grid jalan, gedung low-poly bertekstur jendela prosedural,
 // pelabuhan (kontainer + crane), pantai + laut, highway lingkar, lampu & palem.
-import { CFG, pick, range, rangeInt } from './config.js';
+import { CFG } from './config.js';
+import { pick, range, rangeInt } from './random.js';
 
 const THREE = window.THREE;
 
@@ -82,14 +83,16 @@ export function buildCity(scene, rng) {
   const texB = windowTexture(rng, '#7fa8c9', '#cfe8ff');
   const texC = windowTexture(rng, '#d98a6a', '#ffd9a8');
   const texs = [texA, texB, texC];
-  for (let bx = -2; bx <= 2; bx++) for (let bz = -2; bz <= 2; bz++) {
-    if (bx === 0 && bz === 0) continue; // alun-alun pusat kota
-    const cx = bx * CFG.block, cz = bz * CFG.block;
+  // Gedung: 1-3 per blok. Blok berpusat DI ANTARA jalan (pusat = kelipatan 40 + 20)
+  // supaya gedung tidak pernah menutupi jalan — mobil bisa melaju di jalan.
+  for (let bx = -3; bx <= 1; bx++) for (let bz = -3; bz <= 1; bz++) {
+    if (bx === 0 && bz === 0) continue; // blok timur laut alun-alun dibiarkan lapang
+    const cx = bx * CFG.block + 20, cz = bz * CFG.block + 20;
     const n = rangeInt(rng, 1, 3);
     for (let k = 0; k < n; k++) {
-      const w = range(rng, 10, 18), d = range(rng, 10, 18);
-      const h = range(rng, 9, bz === -2 || bx === -2 ? 42 : 26);
-      const x = cx + range(rng, -9, 9), z = cz + range(rng, -9, 9);
+      const w = range(rng, 10, 16), d = range(rng, 10, 16);
+      const h = range(rng, 9, bx <= -2 || bz <= -2 ? 42 : 26);
+      const x = cx + range(rng, -6, 6), z = cz + range(rng, -6, 6);
       const mat = new THREE.MeshLambertMaterial({
         map: pick(rng, texs), color: pick(rng, CFG.palette),
       });

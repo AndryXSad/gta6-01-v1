@@ -12,7 +12,7 @@ import { createMissions, currentMission, missionTarget, startMission, updateMiss
 import { createHud, updateHud, showToast } from './hud.js';
 import { ensureAudio, engineSound, sfx, setSiren } from './audio.js';
 import { saveGame, loadGame, hasSave, clearSave } from './save.js';
-import { parseShot, applyShot } from './shots.js';
+import { parseShot, applyShot, afterPreroll } from './shots.js';
 
 const THREE = window.THREE;
 const { shot, seed } = parseShot();
@@ -26,7 +26,8 @@ const state = {
   clockMinutes: 9 * 60 + 15, // pagi Solmar 09:15
   time: 0, saveTimer: 0, punchHitDone: false,
 };
-const S = { rng, state, fns: { startMission }, addWanted: null };
+const S = { rng, state, fns: { startMission }, addWanted: null,
+  setCar: (c) => { currentCar = c; } };
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -49,6 +50,7 @@ S.police = police; S.missions = missions;
 S.addWanted = (n) => addWanted(police, n, rng, player.pos);
 
 let currentCar = null;
+let frozen = false; // mode screenshot: bekukan simulasi setelah pre-roll agar frame stabil
 let camYaw = Math.PI, camPitch = 0;
 let keys = {};
 let dragging = false, lastX = 0, lastY = 0;
@@ -190,8 +192,10 @@ const clock = new THREE.Clock();
 let shotCam = null;
 
 function inputState() {
+  // Di shot chase, mobil "digas" selama pre-roll agar terlihat melaju.
+  const shotGas = shot === 'chase' && !frozen;
   return {
-    f: keys.KeyW || keys.ArrowUp, b: keys.KeyS || keys.ArrowDown,
+    f: keys.KeyW || keys.ArrowUp || shotGas, b: keys.KeyS || keys.ArrowDown,
     l: keys.KeyA || keys.ArrowLeft, r: keys.KeyD || keys.ArrowRight,
     run: keys.ShiftLeft || keys.ShiftRight,
     punch: keys.Space || keys.KeyF,
@@ -288,9 +292,9 @@ function step(dt) {
   const speed01 = inCar && currentCar ? Math.abs(currentCar.speed) / CFG.carMaxSpeed : player.speed / CFG.runSpeed;
   if (shotCam) {
     camera.position.set(
-      target.x - Math.sin(shotCam.camYaw) * 11,
-      target.y + 5 + shotCam.camPitch,
-      target.z - Math.cos(shotCam.camYaw) * 11);
+      target.x - Math.sin(shotCam.camYaw) * 14,
+      target.y + 6.5 + shotCam.camPitch,
+      target.z - Math.cos(shotCam.camYaw) * 14);
     camera.lookAt(target.x, target.y + 1.5, target.z);
   } else {
     updateCamera(camera, target, player.heading, camYaw, camPitch, inCar, speed01);
@@ -324,7 +328,7 @@ function step(dt) {
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (state.mode === 'play') step(dt);
+  if (state.mode === 'play' && !frozen) step(dt);
   renderer.render(scene, camera);
 }
 
@@ -337,6 +341,8 @@ if (shot) {
   setMode('play');
   // Biarkan simulasi berjalan beberapa detik agar traffic/polisi tersebar.
   for (let i = 0; i < 90; i++) step(1 / 60);
+  afterPreroll(shot, S);
+  frozen = true; // bekukan frame — screenshot stabil, tidak ada yang tertangkap
   state.mode = 'play';
 }
 loop();

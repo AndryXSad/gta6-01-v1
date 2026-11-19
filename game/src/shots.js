@@ -17,30 +17,31 @@ export function applyShot(shot, S) {
     car.parked = false; car.stolen = true;
     car.mesh.position.set(x, 0, z); car.heading = heading; car.mesh.rotation.y = heading;
     car.speed = speed;
-    S.currentCar = car; P.inCar = true;
+    S.setCar(car); P.inCar = true;
     P.pos.set(x, 0, z);
   };
   const placePolice = (n, x, z) => {
+    // Patroli mengejar dari belakang (arah +z), berbaris agar tidak menabrak pemain.
     for (let i = 0; i < n; i++) {
-      const rng = S.rng;
-      const a = (i / n) * Math.PI * 2;
       const mesh = POL.cars[i] ? POL.cars[i].mesh : null;
       if (!mesh) break;
-      mesh.position.set(x + Math.sin(a) * 14, 0, z + Math.cos(a) * 14);
+      mesh.position.set(x + (i % 2 === 0 ? -5 : 5), 0, z + 16 + i * 10);
+      mesh.rotation.y = Math.PI;
     }
   };
   if (shot === 'chase') {
     // Kejar-kejaran: Rio di mobil curian, wanted 3, 2 patroli di belakang, misi 2 aktif.
     const car = V.parked[2];
-    putInCar(car, 0, 40, Math.PI, 16);
+    putInCar(car, 0, 70, Math.PI, 18);
     S.missions.index = 1;
     const { startMission } = S.fns;
     startMission(M, 1);
     S.missions.stolenCar = car; // sudah dicuri — objektif langsung "bawa ke garasi"
     S.addWanted(3);
-    placePolice(2, 0, 58);
+    placePolice(2, 0, 88);
     S.state.cash = 350;
-    return { camYaw: Math.PI, camPitch: 1.5 };
+    // Kamera dari depan-samping: mobil melaju ke arah kamera, patroli mengejar di belakangnya.
+    return { camYaw: 0.45, camPitch: 1.0 };
   }
   if (shot === 'city') {
     // Jalan kaki di pusat kota: traffic + pejalan kaki + gedung di sekeliling.
@@ -56,22 +57,47 @@ export function applyShot(shot, S) {
   }
   if (shot === 'mission') {
     // Momen misi 1: Rio di pelabuhan, beacon kuning + dialog Kestrel di HUD.
-    P.pos.set(-6, 0, 132); P.heading = Math.PI;
+    // Kamera di utara pemain, menghadap selatan ke beacon & kontainer.
+    P.pos.set(-6, 0, 132); P.heading = 0;
     M.index = 0;
     S.fns.startMission(M, 0);
     S.state.cash = 50;
-    return { camYaw: Math.PI, camPitch: 1 };
+    return { camYaw: 0, camPitch: 1 };
   }
   if (shot === 'police') {
     // Polisi mengejar: wanted 4, patroli + petugas jalan kaki mengepung Rio.
-    P.pos.set(-20, 0, -20); P.heading = Math.PI * 0.25;
+    // Rio di persimpangan jalan (0,-40) — kamera bebas gedung dari sudut ini.
+    P.pos.set(0, 0, -40); P.heading = Math.PI * 0.25;
     S.addWanted(4);
-    placePolice(3, -20, -6);
+    placePolice(3, 0, -24);
     POL.cops.forEach((c, i) => {
-      c.mesh.position.set(-20 + (i - 1) * 6, 0, -28);
+      c.mesh.position.set((i - 1) * 6, 0, -48);
     });
     S.state.health = 62;
     return { camYaw: Math.PI * 0.25, camPitch: 0.5 };
   }
   return null;
+}
+
+// Setelah pre-roll: posisikan polisi relatif terhadap posisi AKHIR pemain,
+// supaya patroli terlihat mengejar di dalam frame (kamera ada di belakang pemain).
+export function afterPreroll(shot, S) {
+  const P = S.player, POL = S.police;
+  if (shot === 'chase') {
+    const px = P.pos.x, pz = P.pos.z;
+    POL.cars.forEach((c, i) => {
+      c.mesh.position.set(px + (i === 0 ? -7 : 7), 0, pz + 16 + i * 9);
+      c.mesh.rotation.y = Math.PI;
+    });
+  }
+  if (shot === 'police') {
+    const px = P.pos.x, pz = P.pos.z;
+    POL.cars.forEach((c, i) => {
+      c.mesh.position.set(px + (i === 0 ? -9 : 9), 0, pz + 13 + i * 8);
+      c.mesh.rotation.y = Math.PI * 0.25;
+    });
+    POL.cops.forEach((c, i) => {
+      c.mesh.position.set(px + (i - 1) * 5, 0, pz + 7);
+    });
+  }
 }

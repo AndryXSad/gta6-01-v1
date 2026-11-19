@@ -1,6 +1,7 @@
 // Kendaraan: bangun mobil low-poly, parkir + NPC, masuk/keluar (E), mencuri,
 // fisika mengemudi arcade (akselerasi, belok, rem tangan, tabrakan kotak).
-import { CFG, pick, range } from './config.js';
+import { CFG } from './config.js';
+import { pick, range } from './random.js';
 import { collideCircle } from './city.js';
 
 const THREE = window.THREE;
@@ -40,11 +41,13 @@ export function makeCarMesh(color, police) {
 
 export function spawnCars(scene, rng, colliders) {
   const cars = [];
-  // Mobil parkir di tepi jalan (bisa dicuri).
+  // Mobil parkir di tepi jalan (bisa dicuri) — sejajar jalan, di luar badan jalan.
   const spots = [];
   for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
     spots.push([i * CFG.block + 7, j * CFG.block + 14]);
-    spots.push([i * CFG.block - 14, j * CFG.block + 7]);
+    spots.push([i * CFG.block - 7, j * CFG.block - 14]);
+    spots.push([i * CFG.block + 14, j * CFG.block + 7]);
+    spots.push([i * CFG.block - 14, j * CFG.block - 7]);
   }
   for (let i = 0; i < 12; i++) {
     const [x, z] = spots[Math.floor(rng() * spots.length)];

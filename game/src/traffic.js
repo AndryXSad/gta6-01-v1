@@ -1,6 +1,7 @@
 // Traffic: mobil mengikuti loop persegi di jalan kota; pejalan kaki menyusuri
 // trotoar, kabur saat ketakutan (tabrakan / pukulan / tembakan di dekatnya).
-import { CFG, pick, range } from './config.js';
+import { CFG } from './config.js';
+import { pick, range } from './random.js';
 import { makeCarMesh } from './vehicles.js';
 
 const THREE = window.THREE;
@@ -15,8 +16,10 @@ function roadLoop(cx, cz, r) {
 export function spawnTraffic(scene, rng) {
   const cars = [];
   for (let i = 0; i < 10; i++) {
-    const bx = Math.floor(range(rng, -2, 3)), bz = Math.floor(range(rng, -2, 3));
-    const loop = roadLoop(bx * CFG.block, bz * CFG.block, CFG.block / 2 + 2);
+    // Loop persegi mengelilingi satu blok, tepat di atas jalan (pusat blok + 20, r 22).
+    const bx = Math.floor(range(rng, -3, 2)), bz = Math.floor(range(rng, -3, 2));
+    if (bx === 0 && bz === 0) { i--; continue; } // jangan lewati air mancur
+    const loop = roadLoop(bx * CFG.block + 20, bz * CFG.block + 20, CFG.block / 2 + 2);
     const mesh = makeCarMesh(pick(rng, CFG.carColors), false);
     const wi = Math.floor(rng() * 4);
     mesh.position.set(loop[wi][0], 0, loop[wi][1]);

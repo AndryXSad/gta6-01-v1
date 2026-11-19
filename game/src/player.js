@@ -1,6 +1,7 @@
 // Rio — pemain jalan kaki: gerak WASD relatif kamera, lari, pukul jarak dekat,
 // kamera third-person orbit (drag mouse / panah). Model low-poly prosedural.
-import { CFG, collideCircle } from './config.js';
+import { CFG } from './config.js';
+import { collideCircle } from './city.js';
 
 const THREE = window.THREE;
 
