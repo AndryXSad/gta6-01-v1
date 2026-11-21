@@ -38,3 +38,13 @@ export function pickInt(rng, min, max) {
 export function pickColor(rng, palette) {
   return pick(rng, palette);
 }
+
+// Acak urutan array (Fisher-Yates) memakai RNG yang sama — deterministik.
+export function shuffle(rng, list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}

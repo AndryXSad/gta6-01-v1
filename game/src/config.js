@@ -30,6 +30,8 @@ export const CFG = {
   // Jam kota: 1 detik nyata = 1 menit kota, mulai 09:40.
   clockStartMinutes: 9 * 60 + 40,
   clockRate: 1,
+  // Pickup kembali muncul sekian detik setelah diambil.
+  pickupRespawnSeconds: 20,
   // Warna kota Solmar: matahari, laut, beton hangat, atap warna-warni.
   colors: {
     sky: 0x8ec9ee,

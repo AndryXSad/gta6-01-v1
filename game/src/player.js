@@ -123,7 +123,9 @@ export function createPlayer(scene) {
         p.walkPhase += dt * p.speed * 1.6;
       }
       // Animasi jalan: kaki & lengan berayun, lengan kanan terangkat saat pukul.
-      const swing = Math.sin(p.walkPhase) * Math.min(1, p.speed / CFG.walkSpeed) * 0.7;
+      // Saat diam, ayunan mereda ke nol supaya Rio tidak "berjalan di tempat".
+      const still = Math.min(1, p.speed / CFG.walkSpeed);
+      const swing = Math.sin(p.walkPhase) * still * 0.7;
       p.legL.rotation.x = swing;
       p.legR.rotation.x = -swing;
       p.armL.rotation.x = -swing;

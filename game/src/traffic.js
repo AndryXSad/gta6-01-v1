@@ -123,7 +123,10 @@ export function createTraffic(scene, city, rng) {
         p.legL.rotation.x = Math.sin(p.phase) * 0.6;
         p.legR.rotation.x = -Math.sin(p.phase) * 0.6;
         p.group.position.copy(p.pos);
-        p.group.rotation.y = Math.atan2(-Math.sin(p.heading), -Math.cos(p.heading)) + (p.flee > 0 ? 0 : 0);
+        // Pejalan kaki menghadap arah jalannya (trotoar sejajar jalan).
+        p.group.rotation.y = p.road.axis === 'z'
+          ? (Math.sin(p.heading) >= 0 ? 0 : Math.PI)
+          : (Math.cos(p.heading) >= 0 ? -Math.PI / 2 : Math.PI / 2);
       }
     },
   };

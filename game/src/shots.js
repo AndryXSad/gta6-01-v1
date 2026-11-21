@@ -27,6 +27,8 @@ export function applyShot(game, info) {
   };
   if (shot === 'chase') {
     // Cover: Rio mengemudi dikejar 2 patroli, wanted 3, misi getaway aktif.
+    // Mobil pemain di highway utara (z -140) menghadap selatan (+z) supaya
+    // kamera di belakangnya menangkap jalan lurus + patroli di belakang.
     missions.index = 3;
     const car = vehicles.heroCar;
     vehicles.enterCar(car, player);

@@ -129,7 +129,7 @@ export function createMissions(scene) {
       } else if (cur.need === 'stolenCar' && d < 9) {
         const inStolen = vehicles.current && vehicles.current.stolen;
         if (inStolen) m.completeCurrent(player);
-        else if (d < 9 && !vehicles.current) m.setToast('Bawa mobil curian ke sini!', 2);
+        else if (!vehicles.current) m.setToast('Bawa mobil curian ke sini — bukan jalan kaki!', 2);
       }
     },
   };

@@ -41,6 +41,7 @@ node serve.ts   # lalu buka http://localhost:8080
 
 Kontrol: WASD jalan/mengemudi, mouse drag putar kamera, Shift lari,
 E masuk/keluar mobil, Space pukul / rem tangan, Esc/P jeda.
+Progres (misi, uang, HP, posisi) tersimpan otomatis di localStorage.
 
 ## Struktur source
 

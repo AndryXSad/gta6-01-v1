@@ -145,11 +145,15 @@ export function createPolice(scene, city, rng) {
         }
       }
       // Tembakan polisi di bintang ≥3 (hit-scan sederhana, ada jeda).
+      // Tembakan hanya bila ada patroli yang cukup dekat; kalau tidak ada
+      // patroli di jangkauan, timer pendek supaya tidak menembak dari jauh.
       pol.shootTimer -= dt;
       if (pol.stars >= CFG.policeShootStars && player.alive && pol.shootTimer <= 0) {
-        const dist = Math.hypot(target.x - (pol.patrols[0]?.pos.x ?? 0),
-          target.z - (pol.patrols[0]?.pos.z ?? 0));
-        if (dist < 55) {
+        const nearest = pol.patrols.reduce((best, p) => {
+          const d = Math.hypot(target.x - p.pos.x, target.z - p.pos.z);
+          return d < best ? d : best;
+        }, Infinity);
+        if (nearest < 55) {
           pol.shootTimer = 1.4;
           if (onPlayerShot) onPlayerShot(6 + pol.stars * 2);
         } else {

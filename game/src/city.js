@@ -12,9 +12,16 @@ function boxMat(color) {
   return new T().MeshLambertMaterial({ color });
 }
 
+// Material di-cache per warna supaya gedung yang sewarna berbagi material
+// (draw call lebih hemat, warna tetap konsisten di seluruh kota).
+function cachedMat(mats, color) {
+  let m = mats.get(color);
+  if (!m) { m = boxMat(color); mats.set(color, m); }
+  return m;
+}
+
 function addBox(scene, mats, x, y, z, w, h, d, color, ry = 0) {
-  const m = new T().Mesh(new T().BoxGeometry(w, h, d), mats.get(color) || boxMat(color));
-  if (!mats.get(color)) mats.set(color, m.material);
+  const m = new T().Mesh(new T().BoxGeometry(w, h, d), cachedMat(mats, color));
   m.position.set(x, y, z);
   m.rotation.y = ry;
   scene.add(m);
@@ -22,8 +29,7 @@ function addBox(scene, mats, x, y, z, w, h, d, color, ry = 0) {
 }
 
 function addCyl(scene, mats, x, y, z, rTop, rBot, h, color, seg = 10) {
-  const m = new T().Mesh(new T().CylinderGeometry(rTop, rBot, h, seg), mats.get(color) || boxMat(color));
-  if (!mats.get(color)) mats.set(color, m.material);
+  const m = new T().Mesh(new T().CylinderGeometry(rTop, rBot, h, seg), cachedMat(mats, color));
   m.position.set(x, y, z);
   scene.add(m);
   return m;

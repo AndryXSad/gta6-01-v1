@@ -29,7 +29,8 @@ if (existsSync(join(here, 'screenshots'))) {
 }
 
 // Batas gate (lihat kit RULES.txt): teks dossier max 160 KiB, max 4 screenshot
-// @ 256 KiB, game/ max 993 entri & 48 MiB, path max 1000 byte.
+// @ 256 KiB, game/ max 993 entri & 48 MiB, path max 1000 byte. Angka-angka ini
+// disalin dari kit segar level 32 (competition.yaml) saat rebuild 21 Nov 2026.
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {

@@ -79,7 +79,8 @@ export function createAudio() {
       engineGain.gain.value = speedNorm > 0.02 ? 0.045 + speedNorm * 0.05 : 0;
     },
 
-    // Sirene naik-turun dua nada saat wanted ≥1.
+    // Sirene naik-turun dua nada saat wanted ≥1. Volume dijaga kecil
+    // supaya tidak menenggelamkan suara mesin.
     siren(dt, wanted) {
       const c = ensure();
       if (!c) return;

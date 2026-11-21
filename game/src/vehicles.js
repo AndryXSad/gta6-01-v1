@@ -118,9 +118,13 @@ export function createVehicles(scene, city, rng, onSteal) {
       v.current = null;
       player.onFoot = true;
       player.group.visible = true;
-      // Turun di sisi kiri mobil.
-      const sideX = car.pos.x + Math.cos(car.heading) * 2.2;
-      const sideZ = car.pos.z - Math.sin(car.heading) * 2.2;
+      // Turun di sisi kiri mobil; bila sisi itu menabrak gedung, pakai sisi kanan.
+      let sideX = car.pos.x + Math.cos(car.heading) * 2.2;
+      let sideZ = car.pos.z - Math.sin(car.heading) * 2.2;
+      if (city.hitsBuilding(sideX, sideZ, 0.5)) {
+        sideX = car.pos.x - Math.cos(car.heading) * 2.2;
+        sideZ = car.pos.z + Math.sin(car.heading) * 2.2;
+      }
       const clamped = city.clampToWorld(sideX, sideZ);
       player.pos.set(clamped.x, 0, clamped.z);
       player.group.position.copy(player.pos);

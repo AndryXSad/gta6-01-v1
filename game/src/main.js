@@ -242,6 +242,7 @@ function animate() {
     if (missions.completedCount > before) { audio.missionDone(); saveGame({ player, police, missions }); }
     checkPickups(dt);
     checkCarPedHits();
+    // Suara mesin mengikuti kecepatan mobil; sirene mengikuti wanted.
     audio.engine(vehicles.current ? Math.abs(vehicles.current.speed) / CFG.driveTop : 0);
     audio.siren(dt, police.stars);
     // Prompt konteks: E masuk mobil / pukul.

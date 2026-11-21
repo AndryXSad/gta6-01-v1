@@ -108,11 +108,12 @@ export function createHud(doc) {
       c.fillStyle = '#4488ff';
       c.fillRect(mx - 2, mz - 2, 4, 4);
     }
-    // Pemain (panah hijau menghadap heading).
+    // Pemain (panah hijau menghadap heading). Minimap: utara = -z ke atas,
+    // jadi rotasi panah memakai heading yang sama dengan dunia game.
     const [px, py] = toMap(player.pos.x, player.pos.z);
     c.save();
     c.translate(px, py);
-    c.rotate(Math.atan2(Math.sin(player.heading), Math.cos(player.heading)) + Math.PI);
+    c.rotate(-player.heading);
     c.fillStyle = '#2ecc71';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
     c.restore();

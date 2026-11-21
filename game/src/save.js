@@ -42,3 +42,10 @@ export function clearSave() {
 export function hasSave() {
   return loadSave() !== null;
 }
+
+// Ringkasan save untuk menu (dipakai main.js saat boot).
+export function saveSummary() {
+  const s = loadSave();
+  if (!s) return null;
+  return `Misi ${s.missionIndex + 1}/4 · $${s.money} · HP ${s.health}`;
+}
