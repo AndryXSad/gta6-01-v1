@@ -1,76 +1,124 @@
-// HUD DOM + minimap canvas 2D: health, armor, uang, bintang wanted, kecepatan,
-// objektif misi, jam kota, dialog cerita. Minimap top-down: jalan, pemain,
-// polisi, penanda misi, pantai & pelabuhan.
+// HUD Solmar: health/armor/uangan/bintang wanted/jam kota/objektif/toast,
+// plus minimap canvas 2D top-down (jalan, laut, pemain, polisi, traffic,
+// penanda misi). Semua DOM sudah ada di index.html.
 import { CFG } from './config.js';
 
-export function createHud() {
-  const el = (id) => document.getElementById(id);
-  return {
-    health: el('hud-health'), armor: el('hud-armor'), cash: el('hud-cash'),
-    stars: el('hud-stars'), speed: el('hud-speed'), objective: el('hud-objective'),
-    dialog: el('hud-dialog'), clock: el('hud-clock'), prompt: el('hud-prompt'),
-    minimap: el('minimap'), toast: el('hud-toast'),
-    ctx: el('minimap').getContext('2d'),
+export function createHud(doc) {
+  const $ = (id) => doc.getElementById(id);
+  const el = {
+    health: $('hud-health'), healthBar: $('hud-health-bar'),
+    armor: $('hud-armor'), money: $('hud-money'),
+    stars: $('hud-stars'), clock: $('hud-clock'),
+    objective: $('hud-objective'), dialog: $('hud-dialog'),
+    toast: $('hud-toast'), speed: $('hud-speed'),
+    prompt: $('hud-prompt'), menu: $('menu'), minimap: $('minimap'),
   };
-}
+  const ctx = el.minimap ? el.minimap.getContext('2d') : null;
 
-let toastTimer = null;
-export function showToast(hud, text) {
-  hud.toast.textContent = text;
-  hud.toast.style.opacity = 1;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { hud.toast.style.opacity = 0; }, 3200);
-}
-
-function drawMinimap(hud, s) {
-  const c = hud.ctx, W = 190, H = 190;
-  const scale = W / 420; // dunia -210..210 -> 0..190
-  const px = (x) => (x + 210) * scale;
-  const pz = (z) => (z + 210) * scale;
-  c.clearRect(0, 0, W, H);
-  c.fillStyle = '#1e3a2f'; c.fillRect(0, 0, W, H); // daratan
-  c.fillStyle = '#2e86c1'; c.fillRect(px(150), 0, W - px(150), H); // laut timur
-  c.fillStyle = '#5d6d7e'; c.fillRect(0, pz(120), W, H - pz(120)); // pelabuhan selatan
-  c.strokeStyle = '#888'; c.lineWidth = 5;
-  for (let i = -2; i <= 2; i++) {
-    c.beginPath(); c.moveTo(px(i * 40), 0); c.lineTo(px(i * 40), H); c.stroke();
-    c.beginPath(); c.moveTo(0, pz(i * 40)); c.lineTo(W, pz(i * 40)); c.stroke();
+  function starString(n) {
+    let s = '';
+    for (let i = 0; i < CFG.wantedMax; i++) s += i < n ? '★' : '☆';
+    return s;
   }
-  c.strokeStyle = '#f5d76e'; c.lineWidth = 2;
-  c.beginPath(); c.arc(px(0), pz(0), 165 * scale, 0, Math.PI * 2); c.stroke(); // highway
-  // Penanda misi (kuning berdenyut).
-  if (s.missionTarget) {
-    c.fillStyle = '#f1c40f';
-    c.beginPath(); c.arc(px(s.missionTarget.x), pz(s.missionTarget.z), 6, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = '#f1c40f';
-    c.beginPath(); c.arc(px(s.missionTarget.x), pz(s.missionTarget.z), 9 + Math.sin(Date.now() / 200) * 2, 0, Math.PI * 2); c.stroke();
-  }
-  // Polisi (biru/merah).
-  c.fillStyle = '#ff2222';
-  for (const p of s.police) { c.beginPath(); c.arc(px(p.x), pz(p.z), 3.5, 0, Math.PI * 2); c.fill(); }
-  // Pemain (panah putih searah heading).
-  c.save();
-  c.translate(px(s.player.x), pz(s.player.z));
-  c.rotate(Math.PI - s.heading);
-  c.fillStyle = '#ffffff';
-  c.beginPath(); c.moveTo(0, -7); c.lineTo(5, 6); c.lineTo(-5, 6); c.closePath(); c.fill();
-  c.restore();
-}
 
-export function updateHud(hud, s) {
-  hud.health.style.width = Math.max(0, s.health) + '%';
-  hud.health.style.background = s.health > 40 ? '#2ecc71' : '#e74c3c';
-  hud.armor.style.width = Math.max(0, s.armor) + '%';
-  hud.cash.textContent = '$' + Math.floor(s.cash).toLocaleString('en-US');
-  hud.stars.textContent = '★'.repeat(s.wanted) + '☆'.repeat(5 - s.wanted);
-  hud.stars.style.color = s.wanted > 0 ? '#ffd700' : '#888';
-  hud.speed.textContent = s.inCar ? Math.round(Math.abs(s.speedKmh)) + ' km/h' : '';
-  hud.speed.style.display = s.inCar ? 'block' : 'none';
-  hud.objective.textContent = s.objective || '';
-  hud.clock.textContent = s.clock;
-  hud.dialog.textContent = s.dialog || '';
-  hud.dialog.style.display = s.dialog ? 'block' : 'none';
-  hud.prompt.textContent = s.prompt || '';
-  hud.prompt.style.display = s.prompt ? 'block' : 'none';
-  drawMinimap(hud, s);
+  function clockString(minutes) {
+    const h = Math.floor(minutes / 60) % 24;
+    const m = Math.floor(minutes % 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  return {
+    el,
+
+    showMenu(show) {
+      if (el.menu) el.menu.style.display = show ? 'flex' : 'none';
+    },
+
+    setPrompt(text) {
+      if (el.prompt) el.prompt.textContent = text || '';
+    },
+
+    update(state) {
+      const { player, police, missions, minutes, speedKmh, driving } = state;
+      if (el.health) el.health.textContent = `HP ${Math.ceil(player.health)}`;
+      if (el.healthBar) el.healthBar.style.width = `${player.health}%`;
+      if (el.armor) el.armor.textContent = player.armor > 0 ? `Armor ${Math.ceil(player.armor)}` : '';
+      if (el.money) el.money.textContent = `$${player.money}`;
+      if (el.stars) {
+        el.stars.textContent = starString(police.stars);
+        el.stars.style.color = police.stars > 0 ? '#ffd23e' : '#ffffff';
+      }
+      if (el.clock) el.clock.textContent = clockString(minutes);
+      if (el.objective) el.objective.textContent = missions.objectiveText();
+      if (el.dialog) el.dialog.textContent = missions.dialogText();
+      if (el.toast) {
+        el.toast.textContent = missions.toastTimer > 0 ? missions.toast : '';
+        el.toast.style.opacity = missions.toastTimer > 0 ? '1' : '0';
+      }
+      if (el.speed) {
+        el.speed.textContent = driving ? `${Math.round(speedKmh)} km/h` : '';
+      }
+      if (ctx && el.minimap) drawMinimap(ctx, state);
+    },
+  };
+
+  function drawMinimap(c, state) {
+    const { player, police, missions, traffic, vehicles } = state;
+    const W = 150, H = 150;
+    const half = CFG.worldHalf;
+    const toMap = (x, z) => [((x + half) / (half * 2)) * W, ((z + half) / (half * 2)) * H];
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#20242c';
+    c.fillRect(0, 0, W, H);
+    // Laut di selatan.
+    c.fillStyle = '#2f7fb8';
+    c.fillRect(0, H * 0.93, W, H * 0.07);
+    // Jalan grid.
+    c.strokeStyle = '#5a5f6a';
+    c.lineWidth = 3;
+    for (const x of CFG.gridXs) {
+      const [mx] = toMap(x, 0);
+      c.beginPath(); c.moveTo(mx, 0); c.lineTo(mx, H); c.stroke();
+    }
+    for (const z of CFG.gridZs) {
+      const [, mz] = toMap(0, z);
+      c.beginPath(); c.moveTo(0, mz); c.lineTo(W, mz); c.stroke();
+    }
+    // Penanda misi (kuning berdenyut).
+    const cur = missions.current();
+    if (cur) {
+      const [mx, mz] = toMap(cur.target.x, cur.target.z);
+      c.fillStyle = '#f5d76e';
+      c.beginPath(); c.arc(mx, mz, 5 + Math.sin(Date.now() * 0.006) * 1.5, 0, Math.PI * 2); c.fill();
+    }
+    // Traffic (abu-abu), mobil parkir (putih kecil).
+    c.fillStyle = '#9aa0aa';
+    for (const t of traffic.cars) {
+      const [mx, mz] = toMap(t.pos.x, t.pos.z);
+      c.fillRect(mx - 1.5, mz - 1.5, 3, 3);
+    }
+    // Polisi (biru/merah).
+    for (const p of police.patrols) {
+      const [mx, mz] = toMap(p.pos.x, p.pos.z);
+      c.fillStyle = '#ff4444';
+      c.beginPath(); c.arc(mx, mz, 3.5, 0, Math.PI * 2); c.fill();
+    }
+    for (const o of police.officers) {
+      const [mx, mz] = toMap(o.pos.x, o.pos.z);
+      c.fillStyle = '#4488ff';
+      c.fillRect(mx - 2, mz - 2, 4, 4);
+    }
+    // Pemain (panah hijau menghadap heading).
+    const [px, py] = toMap(player.pos.x, player.pos.z);
+    c.save();
+    c.translate(px, py);
+    c.rotate(Math.atan2(Math.sin(player.heading), Math.cos(player.heading)) + Math.PI);
+    c.fillStyle = '#2ecc71';
+    c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
+    c.restore();
+    // Bingkai.
+    c.strokeStyle = '#f5d76e';
+    c.lineWidth = 2;
+    c.strokeRect(1, 1, W - 2, H - 2);
+  }
 }

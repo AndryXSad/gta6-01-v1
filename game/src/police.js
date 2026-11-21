@@ -1,130 +1,163 @@
-// Polisi & wanted level 1–5: mobil patroli mengejar & menabrak, petugas jalan
-// kaki mengejar & menangkap (busted), menembak di bintang ≥3. Bintang turun bila
-// lolos cukup lama tanpa kejahatan baru.
-// Jumlah patroli mengikuti bintang supaya tekanan naik bertahap, bukan mendadak.
+// Polisi Solmar: wanted level 1–5, mobil patroli + petugas jalan kaki.
+// Bintang naik saat mencuri mobil / menabrak pejalan kaki / memukul polisi;
+// turun bila pemain lolos cukup lama. Bintang ≥3: polisi menembak.
 import { CFG } from './config.js';
-import { makeCarMesh } from './vehicles.js';
+import { buildCarMesh } from './vehicles.js';
 
-const THREE = window.THREE;
+const T = () => window.THREE;
 
-export function createPolice(scene) {
-  return {
-    wanted: 0, decayTimer: 0, bustedTimer: 0, shootTimer: 0,
-    cars: [], cops: [], tracers: [],
-    scene,
-  };
-}
-
-function spawnPoliceCar(pol, rng, near) {
-  const mesh = makeCarMesh(0xecf0f1, true);
-  const a = rng() * Math.PI * 2;
-  mesh.position.set(near.x + Math.sin(a) * 55, 0, near.z + Math.cos(a) * 55);
-  pol.scene.add(mesh);
-  pol.cars.push({ mesh, heading: 0, speed: 0, sirenPhase: rng() * 6 });
-}
-
-function spawnCop(pol, rng, near) {
+function makeOfficer(scene) {
+  const THREE = T();
   const g = new THREE.Group();
-  const navy = new THREE.MeshLambertMaterial({ color: 0x1a5276 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), navy);
-  body.position.y = 1.15; g.add(body);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55),
-    new THREE.MeshLambertMaterial({ color: 0xd9a066 }));
-  head.position.y = 2.0; g.add(head);
-  const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.18, 8), navy);
-  hat.position.y = 2.32; g.add(hat);
-  const a = rng() * Math.PI * 2;
-  g.position.set(near.x + Math.sin(a) * 25, 0, near.z + Math.cos(a) * 25);
-  pol.scene.add(g);
-  pol.cops.push({ mesh: g, speed: 5.2 });
+  const navy = new THREE.MeshLambertMaterial({ color: 0x1a2a4a });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xe0ac69 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.4, 0.55), navy);
+  body.position.y = 1.3;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), skin);
+  head.position.y = 2.35;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 0.2, 10), navy);
+  cap.position.y = 2.66;
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.9, 0.36), navy);
+  legL.position.set(-0.25, 0.45, 0);
+  const legR = legL.clone(); legR.position.x = 0.25;
+  g.add(body, head, cap, legL, legR);
+  scene.add(g);
+  return { group: g, legL, legR };
 }
 
-export function addWanted(pol, n, rng, playerPos) {
-  pol.wanted = Math.min(CFG.maxWanted, pol.wanted + n);
-  pol.decayTimer = CFG.wantedDecay;
-  const wantCars = Math.min(pol.wanted, 4);
-  while (pol.cars.length < wantCars) spawnPoliceCar(pol, rng, playerPos);
-  const wantCops = pol.wanted >= 2 ? Math.min(pol.wanted - 1, 3) : 0;
-  while (pol.cops.length < wantCops) spawnCop(pol, rng, playerPos);
-}
+export function createPolice(scene, city, rng) {
+  const THREE = T();
+  const pol = {
+    stars: 0,
+    heat: 0, // 0..100, menentukan naik/turun bintang
+    quietTimer: 0,
+    shootTimer: 0,
+    patrols: [],
+    officers: [],
+    bustedFlash: 0,
 
-export function clearWanted(pol) {
-  pol.wanted = 0; pol.decayTimer = 0; pol.bustedTimer = 0;
-  for (const c of pol.cars) pol.scene.remove(c.mesh);
-  for (const c of pol.cops) pol.scene.remove(c.mesh);
-  pol.cars = []; pol.cops = [];
-}
+    addHeat(amount, reason) {
+      pol.heat = Math.min(100, pol.heat + amount);
+      pol.quietTimer = 0;
+      const want = pol.heat >= 85 ? 5 : pol.heat >= 65 ? 4 : pol.heat >= 45 ? 3
+        : pol.heat >= 25 ? 2 : pol.heat >= 8 ? 1 : 0;
+      if (want > pol.stars) pol.stars = want;
+      pol.syncUnits();
+      return reason;
+    },
 
-function fireTracer(pol, from, to) {
-  const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
-  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffee88 }));
-  pol.scene.add(line);
-  pol.tracers.push({ line, life: 0.12 });
-  setTimeout(() => { pol.scene.remove(line); }, 130);
-}
+    clearWanted() {
+      pol.stars = 0;
+      pol.heat = 0;
+      pol.syncUnits();
+    },
 
-// Update pengejaran. cb: {onBusted, onShot(dmg), onRam}.
-// Mengembalikan true bila pemain tertangkap (busted).
-export function updatePolice(pol, dt, rng, playerPos, playerInCar, playerSpeed, cb) {
-  if (pol.wanted <= 0) return false;
-  pol.decayTimer -= dt;
-  if (pol.decayTimer <= 0) { clearWanted(pol); return false; }
-  const target = playerPos;
-  for (const c of pol.cars) {
-    const dx = target.x - c.mesh.position.x, dz = target.z - c.mesh.position.z;
-    const d = Math.hypot(dx, dz);
-    const want = Math.atan2(dx, dz);
-    let dh = want - c.mesh.rotation.y;
-    while (dh > Math.PI) dh -= Math.PI * 2;
-    while (dh < -Math.PI) dh += Math.PI * 2;
-    c.mesh.rotation.y += Math.max(-2.6 * dt, Math.min(2.6 * dt, dh));
-    const sp = Math.min(CFG.policeCarSpeed, 14 + pol.wanted * 3.5);
-    c.speed = d > 8 ? sp : sp * 0.6;
-    c.mesh.position.x += Math.sin(c.mesh.rotation.y) * c.speed * dt;
-    c.mesh.position.z += Math.cos(c.mesh.rotation.y) * c.speed * dt;
-    // Lampu sirene berkedip.
-    c.sirenPhase += dt * 8;
-    if (c.mesh.userData.lightBar) {
-      c.mesh.userData.lightBar.material.color.setHex(
-        Math.sin(c.sirenPhase) > 0 ? 0xff0000 : 0x0000ff);
-    }
-    for (const w of c.mesh.userData.wheels) w.rotation.x += c.speed * dt * 2;
-    // Menabrak pemain (di mobil): guncangan & wanted tetap.
-    if (d < 3.6 && playerInCar && Math.abs(playerSpeed) < 20) cb.onRam && cb.onRam();
-  }
-  // Petugas jalan kaki mengejar pemain yang jalan kaki.
-  let busted = false;
-  for (const cop of pol.cops) {
-    const dx = target.x - cop.mesh.position.x, dz = target.z - cop.mesh.position.z;
-    const d = Math.hypot(dx, dz);
-    const want = Math.atan2(dx, dz);
-    cop.mesh.rotation.y = want;
-    if (d > 1.6) {
-      cop.mesh.position.x += Math.sin(want) * cop.speed * dt;
-      cop.mesh.position.z += Math.cos(want) * cop.speed * dt;
-    }
-    if (!playerInCar && d < 2.2) {
-      pol.bustedTimer += dt;
-      if (pol.bustedTimer > CFG.bustedTime) { busted = true; break; }
-    }
-  }
-  if (playerInCar || pol.cops.length === 0) pol.bustedTimer = 0;
-  // Menembak di bintang ≥3 (hit-scan sederhana).
-  if (pol.wanted >= 3) {
-    pol.shootTimer -= dt;
-    if (pol.shootTimer <= 0) {
-      pol.shootTimer = 1.4;
-      const shooter = pol.cars[0] || pol.cops[0];
-      if (shooter) {
-        const from = shooter.mesh.position.clone(); from.y = 1.5;
-        const to = new THREE.Vector3(target.x, 1.4, target.z);
-        const d = from.distanceTo(to);
-        if (d < CFG.policeShootRange) {
-          fireTracer(pol, from, to);
-          if (rng() < 0.45) cb.onShot && cb.onShot(CFG.policeShotDamage);
+    // Jumlah unit aktif mengikuti bintang: 1 bintang = 1 patroli, dst.
+    syncUnits() {
+      const wantPatrols = Math.min(4, pol.stars);
+      while (pol.patrols.length < wantPatrols) {
+        const group = buildCarMesh(0x111111, true);
+        const a = Math.random() * Math.PI * 2;
+        group.position.set(Math.cos(a) * 60, 0, Math.sin(a) * 60);
+        scene.add(group);
+        pol.patrols.push({
+          group, pos: group.position, heading: 0, speed: 0, stuck: 0,
+        });
+      }
+      while (pol.patrols.length > wantPatrols) {
+        const p = pol.patrols.pop();
+        scene.remove(p.group);
+      }
+      const wantOfficers = pol.stars >= 2 ? Math.min(3, pol.stars - 1) : 0;
+      while (pol.officers.length < wantOfficers) {
+        const m = makeOfficer(scene);
+        m.group.position.set(20 + pol.officers.length * 8, 0, -30);
+        pol.officers.push({
+          ...m, pos: m.group.position, heading: 0, speed: 0, phase: 0,
+          punchCooldown: 0, dead: false,
+        });
+      }
+      while (pol.officers.length > wantOfficers) {
+        const o = pol.officers.pop();
+        scene.remove(o.group);
+      }
+    },
+
+    update(dt, player, playerCar, city, onPlayerShot) {
+      if (pol.stars === 0) {
+        pol.quietTimer = 0;
+        return;
+      }
+      pol.quietTimer += dt;
+      // Lolos: bintang turun satu per satu bila lama tak terlihat nakal.
+      if (pol.quietTimer > CFG.wantedDecaySeconds) {
+        pol.stars -= 1;
+        pol.heat = Math.max(0, pol.heat - 22);
+        pol.quietTimer = 0;
+        pol.syncUnits();
+      }
+      const target = player.pos;
+      const aggression = 0.55 + pol.stars * 0.16;
+      for (const p of pol.patrols) {
+        const dx = target.x - p.pos.x, dz = target.z - p.pos.z;
+        const dist = Math.hypot(dx, dz) || 1;
+        const wantHeading = Math.atan2(-dx, -dz);
+        let dh = wantHeading - p.heading;
+        while (dh > Math.PI) dh -= Math.PI * 2;
+        while (dh < -Math.PI) dh += Math.PI * 2;
+        p.heading += Math.max(-1.6 * dt, Math.min(1.6 * dt, dh));
+        const desired = dist > 7 ? 15 + pol.stars * 3.5 : 6;
+        p.speed += (desired - p.speed) * Math.min(1, dt * 2);
+        const nx = p.pos.x + -Math.sin(p.heading) * p.speed * dt;
+        const nz = p.pos.z + -Math.cos(p.heading) * p.speed * dt;
+        if (!city.hitsBuilding(nx, p.pos.z, 2.2)) p.pos.x = nx;
+        if (!city.hitsBuilding(p.pos.x, nz, 2.2)) p.pos.z = nz;
+        const clamped = city.clampToWorld(p.pos.x, p.pos.z);
+        p.pos.x = clamped.x; p.pos.z = clamped.z;
+        p.group.rotation.y = p.heading;
+        // Menabrak pemain yang jalan kaki = tangkap / lukai.
+        if (dist < 3.2 && player.onFoot && player.alive) {
+          player.takeDamage(26 * dt * aggression);
+          pol.bustedFlash = 0.4;
+        }
+        // Menabrak mobil pemain = dorong & perlambat.
+        if (playerCar && dist < 4.5) {
+          playerCar.speed *= (1 - 0.9 * dt);
         }
       }
-    }
-  }
-  return busted;
+      // Petugas jalan kaki mengejar & menangkap.
+      for (const o of pol.officers) {
+        const dx = target.x - o.pos.x, dz = target.z - o.pos.z;
+        const dist = Math.hypot(dx, dz) || 1;
+        const sp = 6.4 + pol.stars * 0.4;
+        o.pos.x += (dx / dist) * sp * dt;
+        o.pos.z += (dz / dist) * sp * dt;
+        o.phase += dt * sp * 1.8;
+        o.legL.rotation.x = Math.sin(o.phase) * 0.7;
+        o.legR.rotation.x = -Math.sin(o.phase) * 0.7;
+        o.group.position.copy(o.pos);
+        o.group.rotation.y = Math.atan2(-dx, -dz);
+        o.punchCooldown = Math.max(0, o.punchCooldown - dt);
+        if (dist < 2.2 && player.onFoot && player.alive && o.punchCooldown <= 0) {
+          o.punchCooldown = 1.1;
+          player.takeDamage(10);
+          pol.bustedFlash = 0.3;
+        }
+      }
+      // Tembakan polisi di bintang ≥3 (hit-scan sederhana, ada jeda).
+      pol.shootTimer -= dt;
+      if (pol.stars >= CFG.policeShootStars && player.alive && pol.shootTimer <= 0) {
+        const dist = Math.hypot(target.x - (pol.patrols[0]?.pos.x ?? 0),
+          target.z - (pol.patrols[0]?.pos.z ?? 0));
+        if (dist < 55) {
+          pol.shootTimer = 1.4;
+          if (onPlayerShot) onPlayerShot(6 + pol.stars * 2);
+        } else {
+          pol.shootTimer = 0.5;
+        }
+      }
+      pol.bustedFlash = Math.max(0, pol.bustedFlash - dt);
+    },
+  };
+  return pol;
 }

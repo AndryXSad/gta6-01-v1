@@ -1,26 +1,44 @@
-// Save/load localStorage — progresi Rio: uang, misi terbuka, health, posisi.
-// Versi kunci (v1) dijaga supaya save lama yang tidak cocok diabaikan, bukan crash.
+// Save Solmar: progres (misi, uang, HP, posisi, wanted) di localStorage.
+// Kunci berversi supaya save lama yang rusak tidak merusak game baru.
 const KEY = 'solmar-save-v1';
+
+export function loadSave() {
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') return null;
+    if (typeof data.missionIndex !== 'number') return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 export function saveGame(state) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({
-      cash: state.cash, missionIndex: state.missionIndex,
-      health: state.health, completed: state.completedMissions,
-      pos: state.playerPos, time: state.clockMinutes, savedAt: Date.now(),
-    }));
-  } catch (e) { /* penyimpanan penuh / privat: game tetap jalan */ }
+    const data = {
+      missionIndex: state.missions.index,
+      money: state.player.money,
+      health: Math.round(state.player.health),
+      armor: Math.round(state.player.armor),
+      x: Math.round(state.player.pos.x * 10) / 10,
+      z: Math.round(state.player.pos.z * 10) / 10,
+      stars: state.police.stars,
+      completed: state.missions.completedCount,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(KEY, JSON.stringify(data));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function loadGame() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw);
-    if (typeof d.cash !== 'number' || typeof d.missionIndex !== 'number') return null;
-    return d;
-  } catch (e) { return null; }
+export function clearSave() {
+  try { window.localStorage.removeItem(KEY); } catch { /* abaikan */ }
 }
 
-export function hasSave() { return loadGame() !== null; }
-export function clearSave() { try { localStorage.removeItem(KEY); } catch (e) {} }
+export function hasSave() {
+  return loadSave() !== null;
+}

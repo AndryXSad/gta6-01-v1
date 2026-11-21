@@ -1,107 +1,130 @@
-// Traffic: mobil mengikuti loop persegi di jalan kota; pejalan kaki menyusuri
-// trotoar, kabur saat ketakutan (tabrakan / pukulan / tembakan di dekatnya).
-// Loop traffic selalu tepat di atas jalan supaya mobil tidak memotong gedung.
+// Traffic Solmar: mobil NPC mengikuti loop jalan grid + pejalan kaki di
+// trotoar. Pejalan kaki kabur bila mobil pemain melaju kencang di dekatnya;
+// mobil traffic mengerem bila ada mobil di depannya.
 import { CFG } from './config.js';
-import { pick, range } from './random.js';
-import { makeCarMesh } from './vehicles.js';
+import { pick, range, pickInt } from './random.js';
+import { buildCarMesh, CAR_COLORS } from './vehicles.js';
 
-const THREE = window.THREE;
+const T = () => window.THREE;
 
-function roadLoop(cx, cz, r) {
-  // Loop persegi sekeliling satu blok, searah jarum jam.
-  return [
-    [cx - r, cz - r], [cx + r, cz - r], [cx + r, cz + r], [cx - r, cz + r],
-  ];
+function makePedestrian(scene, color) {
+  const THREE = T();
+  const g = new THREE.Group();
+  const shirt = new THREE.MeshLambertMaterial({ color });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xe0ac69 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.3, 0.5), shirt);
+  body.position.y = 1.25;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 10, 8), skin);
+  head.position.y = 2.2;
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.9, 0.34), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+  legL.position.set(-0.22, 0.45, 0);
+  const legR = legL.clone(); legR.position.x = 0.22;
+  g.add(body, head, legL, legR);
+  scene.add(g);
+  return { group: g, legL, legR };
 }
 
-export function spawnTraffic(scene, rng) {
+export function createTraffic(scene, city, rng) {
+  const THREE = T();
+  const gridRoads = city.roads.filter((r) => !r.highway);
   const cars = [];
-  for (let i = 0; i < 10; i++) {
-    // Loop persegi mengelilingi satu blok, tepat di atas jalan (pusat blok + 20, r 22).
-    const bx = Math.floor(range(rng, -3, 2)), bz = Math.floor(range(rng, -3, 2));
-    if (bx === 0 && bz === 0) { i--; continue; } // jangan lewati air mancur
-    const loop = roadLoop(bx * CFG.block + 20, bz * CFG.block + 20, CFG.block / 2 + 2);
-    const mesh = makeCarMesh(pick(rng, CFG.carColors), false);
-    const wi = Math.floor(rng() * 4);
-    mesh.position.set(loop[wi][0], 0, loop[wi][1]);
-    scene.add(mesh);
-    cars.push({ mesh, loop, wi, speed: range(rng, 7, 11), t: rng() });
+  for (let i = 0; i < 9; i++) {
+    const road = pick(rng, gridRoads);
+    const along = range(rng, -200, 200);
+    const color = pick(rng, CAR_COLORS);
+    const group = buildCarMesh(color);
+    const pos = road.axis === 'z'
+      ? { x: road.at - 3.2, z: along, heading: Math.PI }
+      : { x: along, z: road.at - 3.2, heading: -Math.PI / 2 };
+    group.position.set(pos.x, 0, pos.z);
+    group.rotation.y = pos.heading;
+    scene.add(group);
+    cars.push({
+      group, road, pos: group.position, heading: pos.heading,
+      speed: range(rng, 7, 12), baseSpeed: 0, color, dead: false,
+    });
+    cars[cars.length - 1].baseSpeed = cars[cars.length - 1].speed;
   }
-  // Pejalan kaki: warna baju acak, jalan di trotoar.
+
+  const pedColors = [0x1abc9c, 0xe67e22, 0x8e44ad, 0x16a085, 0xc0392b, 0x2c3e50];
   const peds = [];
-  const shirtCols = [0x9b59b6, 0x1abc9c, 0xe67e22, 0x34495e, 0xd35400, 0x16a085];
-  for (let i = 0; i < 22; i++) {
-    const g = new THREE.Group();
-    const shirt = new THREE.MeshLambertMaterial({ color: pick(rng, shirtCols) });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.45), shirt);
-    body.position.y = 1.05; g.add(body);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5),
-      new THREE.MeshLambertMaterial({ color: 0xd9a066 }));
-    head.position.y = 1.85; g.add(head);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, 0.32),
-      new THREE.MeshLambertMaterial({ color: 0x2c3e50 }));
-    leg.position.set(-0.2, 0.4, 0); g.add(leg);
-    const leg2 = leg.clone(); leg2.position.x = 0.2; g.add(leg2);
-    const x = range(rng, -100, 100), z = range(rng, -100, 100);
-    g.position.set(x, 0, z);
-    scene.add(g);
-    peds.push({ mesh: g, x, z, heading: range(rng, 0, Math.PI * 2),
-      speed: range(rng, 1.2, 2.2), scared: 0, leg, leg2, phase: rng() * 6 });
+  for (let i = 0; i < 14; i++) {
+    const road = pick(rng, gridRoads);
+    const along = range(rng, -220, 220);
+    const side = rng() < 0.5 ? -8.5 : 8.5;
+    const mesh = makePedestrian(scene, pick(rng, pedColors));
+    const pos = road.axis === 'z'
+      ? { x: road.at + side, z: along }
+      : { x: along, z: road.at + side };
+    mesh.group.position.set(pos.x, 0, pos.z);
+    peds.push({
+      ...mesh, pos: mesh.group.position, heading: range(rng, 0, Math.PI * 2),
+      speed: range(rng, 1.2, 2.2), flee: 0, phase: range(rng, 0, 6),
+      road, side, dead: false, scared: false,
+    });
   }
-  return { cars, peds };
-}
 
-export function updateTraffic(t, dt, playerPos, playerSpeed) {
-  for (const c of t.cars) {
-    const target = c.loop[(c.wi + 1) % 4];
-    const dx = target[0] - c.mesh.position.x, dz = target[1] - c.mesh.position.z;
-    const d = Math.hypot(dx, dz);
-    if (d < 1.2) { c.wi = (c.wi + 1) % 4; continue; }
-    const want = Math.atan2(dx, dz);
-    let dh = want - c.mesh.rotation.y;
-    while (dh > Math.PI) dh -= Math.PI * 2;
-    while (dh < -Math.PI) dh += Math.PI * 2;
-    c.mesh.rotation.y += Math.max(-2.4 * dt, Math.min(2.4 * dt, dh));
-    c.mesh.position.x += Math.sin(c.mesh.rotation.y) * c.speed * dt;
-    c.mesh.position.z += Math.cos(c.mesh.rotation.y) * c.speed * dt;
-    for (const w of c.mesh.userData.wheels) w.rotation.x += c.speed * dt * 2;
-  }
-  for (const p of t.peds) {
-    // Takut: lari menjauh dari pemain bila pemain ngebut / dekat.
-    const dx = p.x - playerPos.x, dz = p.z - playerPos.z;
-    const d = Math.hypot(dx, dz);
-    if (d < 6 && playerSpeed > 4) p.scared = 2;
-    if (p.scared > 0) {
-      p.scared -= dt;
-      p.heading = Math.atan2(dx, dz);
-      p.speed = 5;
-    } else p.speed = 1.6;
-    p.x += Math.sin(p.heading) * p.speed * dt;
-    p.z += Math.cos(p.heading) * p.speed * dt;
-    // Belok acak di persimpangan.
-    if (Math.abs(p.x % CFG.block) < 1 && Math.random() < 0.002) p.heading += Math.PI / 2;
-    p.x = Math.max(-115, Math.min(165, p.x));
-    p.z = Math.max(-115, Math.min(165, p.z));
-    p.mesh.position.set(p.x, 0, p.z);
-    p.mesh.rotation.y = p.heading;
-    p.phase += dt * p.speed * 2;
-    p.leg.rotation.x = Math.sin(p.phase) * 0.5;
-    p.leg2.rotation.x = -Math.sin(p.phase) * 0.5;
-  }
-}
+  return {
+    cars, peds,
 
-// Pejalan kaki yang tertabrak mobil pemain: jatuh (terbaring) & menghilang.
-export function checkPedHit(t, carPos, carSpeed) {
-  if (carSpeed < 5) return null;
-  for (const p of t.peds) {
-    const d = Math.hypot(p.x - carPos.x, p.z - carPos.z);
-    if (d < 2.2) {
-      p.mesh.rotation.x = Math.PI / 2; // terbaring
-      p.mesh.position.y = 0.4;
-      p.speed = 0; p.scared = 0;
-      setTimeout(() => { p.mesh.visible = false; }, 4000);
-      return p;
-    }
-  }
-  return null;
+    update(dt, player, playerCar) {
+      // Mobil traffic: maju di jalurnya, putar balik di ujung kota.
+      for (const c of cars) {
+        let target = c.baseSpeed;
+        // Erem bila mobil pemain / traffic lain tepat di depan.
+        const fx = -Math.sin(c.heading), fz = -Math.cos(c.heading);
+        const ahead = [playerCar, ...cars].filter(Boolean);
+        for (const o of ahead) {
+          if (o === c) continue;
+          const dx = o.pos.x - c.pos.x, dz = o.pos.z - c.pos.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 9 && dist > 0.1 && (dx * fx + dz * fz) / dist > 0.7) { target = 0; break; }
+        }
+        c.speed += (target - c.speed) * Math.min(1, dt * 3);
+        c.pos.x += -Math.sin(c.heading) * c.speed * dt;
+        c.pos.z += -Math.cos(c.heading) * c.speed * dt;
+        if (c.pos.x < -CFG.worldHalf + 8 || c.pos.x > CFG.worldHalf - 8 ||
+            c.pos.z < -CFG.worldHalf + 8 || c.pos.z > CFG.worldHalf - 8) {
+          c.heading += Math.PI; // putar balik
+          c.group.rotation.y = c.heading;
+        }
+      }
+      // Pejalan kaki: jalan di trotoar, kabur dari mobil kencang.
+      for (const p of peds) {
+        p.flee = Math.max(0, p.flee - dt);
+        let sp = p.speed;
+        if (playerCar && !player.onFoot) {
+          const d = Math.hypot(playerCar.pos.x - p.pos.x, playerCar.pos.z - p.pos.z);
+          if (d < 14 && Math.abs(playerCar.speed) > 12) {
+            p.flee = 1.6;
+            p.scared = true;
+          }
+        }
+        if (p.flee > 0) {
+          sp = 5.5;
+          // Lari menjauhi jalan (ke arah trotoar luar).
+          const away = p.road.axis === 'z'
+            ? Math.sign(p.pos.x - p.road.at) : 0;
+          const awayZ = p.road.axis === 'x'
+            ? Math.sign(p.pos.z - p.road.at) : 0;
+          p.pos.x += away * sp * dt;
+          p.pos.z += awayZ * sp * dt;
+        } else {
+          // Jalan lurus di trotoar, berbalik di ujung.
+          const dirX = p.road.axis === 'z' ? 0 : Math.cos(p.heading);
+          const dirZ = p.road.axis === 'z' ? Math.sin(p.heading) : 0;
+          p.pos.x += dirX * sp * dt;
+          p.pos.z += dirZ * sp * dt;
+          if (Math.abs(p.pos.x) > CFG.worldHalf - 10 || Math.abs(p.pos.z) > CFG.worldHalf - 10) {
+            p.heading += Math.PI;
+          }
+        }
+        p.phase += dt * sp * 2.4;
+        p.legL.rotation.x = Math.sin(p.phase) * 0.6;
+        p.legR.rotation.x = -Math.sin(p.phase) * 0.6;
+        p.group.position.copy(p.pos);
+        p.group.rotation.y = Math.atan2(-Math.sin(p.heading), -Math.cos(p.heading)) + (p.flee > 0 ? 0 : 0);
+      }
+    },
+  };
 }

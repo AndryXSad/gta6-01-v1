@@ -1,91 +1,137 @@
-// Misi & cerita: 4 misi berurutan Rio vs Madame Kestrel. Penanda beacon 3D
-// berdenyut + panah arah, dialog singkat, hadiah uang, layar misi selesai.
-import { MISSIONS } from './config.js';
+// Misi Solmar: 4 pekerjaan Rio untuk Madame Kestrel. Tiap misi punya
+// penanda beacon (silinder cahaya) + dialog singkat + hadiah uang.
+// Selesai semua = epilog "bebas utang" + bonus.
+import { CFG } from './config.js';
 
-const THREE = window.THREE;
+const T = () => window.THREE;
+
+export const MISSION_DEFS = [
+  {
+    id: 'paket',
+    title: 'Paket Pelabuhan',
+    giver: 'Madame Kestrel',
+    text: 'Antar paket ini ke dermaga barat. Jangan berhenti di tengah jalan.',
+    target: CFG.spots.harbor,
+    reward: 120,
+    need: 'reach',
+    hint: 'Ikuti penanda kuning ke pelabuhan.',
+  },
+  {
+    id: 'curi',
+    title: 'Mobil untuk Ombak',
+    giver: 'Madame Kestrel',
+    text: 'Ombak butuh mobil bagus. Curi satu, bawa ke garasi timur. Polisi akan marah.',
+    target: CFG.spots.garage,
+    reward: 250,
+    need: 'stolenCar',
+    hint: 'Tekan E di dekat mobil parkir, lalu bawa ke garasi.',
+  },
+  {
+    id: 'jemput',
+    title: 'Jemput Sari',
+    giver: 'Sari',
+    text: 'Aku di boulevard pantai. Jemput aku sebelum patroli lewat sini!',
+    target: CFG.spots.boulevard,
+    reward: 200,
+    need: 'reach',
+    hint: 'Ke boulevard pantai di selatan.',
+  },
+  {
+    id: 'getaway',
+    title: 'Getaway Terakhir',
+    giver: 'Madame Kestrel',
+    text: 'Terakhir: bawa Sari lewat highway utara dan hilang. Utangmu lunas.',
+    target: CFG.spots.highwayNorth,
+    reward: 500,
+    need: 'reach',
+    hint: 'Highway utara — gas pol, jangan berhenti.',
+  },
+];
 
 export function createMissions(scene) {
-  // Beacon: silinder cahaya + cincin di tanah di titik objektif.
-  const beacon = new THREE.Group();
-  const beam = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.2, 1.2, 60, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.28, side: THREE.DoubleSide }));
-  beam.position.y = 30; beacon.add(beam);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(3, 4.5, 32),
-    new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15; beacon.add(ring);
-  beacon.visible = false;
+  const THREE = T();
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: 0xf5d76e, transparent: true, opacity: 0.45,
+  });
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 30, 18, 1, true), beaconMat);
+  beacon.position.set(0, 15, 0);
   scene.add(beacon);
-  // Penanda rekan (Sari) — sosok menunggu di boulevard.
-  const sari = new THREE.Group();
-  const dress = new THREE.MeshLambertMaterial({ color: 0x1abc9c });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.5), dress);
-  body.position.y = 1.15; sari.add(body);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55),
-    new THREE.MeshLambertMaterial({ color: 0x8d5524 }));
-  head.position.y = 2.0; sari.add(head);
-  sari.position.set(138, 0, 20);
-  sari.visible = false;
-  scene.add(sari);
-  return {
-    index: 0, beacon, sari, done: false, phase: 'go', // go | return
-    stolenCar: null, dialog: '', dialogTimer: 0,
+  const ring = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.4, 24),
+    new THREE.MeshBasicMaterial({ color: 0xf5d76e, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.2;
+  scene.add(ring);
+
+  const m = {
+    defs: MISSION_DEFS,
+    index: 0,
+    done: false,
+    completedCount: 0,
+    earned: 0,
+    toast: '',
+    toastTimer: 0,
+    beacon, ring,
+
+    current() {
+      return m.index < m.defs.length ? m.defs[m.index] : null;
+    },
+
+    objectiveText() {
+      const cur = m.current();
+      if (m.done) return 'Semua misi selesai — Rio bebas utang!';
+      return cur ? `${cur.title}: ${cur.hint}` : '';
+    },
+
+    dialogText() {
+      const cur = m.current();
+      if (m.done) return 'Kestrel: "Utang lunas. Solmar milikmu sekarang, Rio."';
+      return cur ? `${cur.giver}: "${cur.text}"` : '';
+    },
+
+    setToast(text, seconds = 4) {
+      m.toast = text;
+      m.toastTimer = seconds;
+    },
+
+    completeCurrent(player) {
+      const cur = m.current();
+      if (!cur) return;
+      player.money += cur.reward;
+      m.earned += cur.reward;
+      m.completedCount += 1;
+      m.setToast(`Misi selesai: ${cur.title}  +$${cur.reward}`, 4.5);
+      m.index += 1;
+      if (m.index >= m.defs.length) {
+        m.done = true;
+        player.money += 300;
+        m.earned += 300;
+        m.setToast('SEMUA MISI SELESAI — bonus $300. Rio bebas utang!', 6);
+      }
+    },
+
+    // Dipanggil tiap frame: cek kedatangan di penanda.
+    update(dt, player, vehicles) {
+      m.toastTimer = Math.max(0, m.toastTimer - dt);
+      const cur = m.current();
+      if (!cur) {
+        beacon.visible = false;
+        ring.visible = false;
+        return;
+      }
+      beacon.position.set(cur.target.x, 15, cur.target.z);
+      ring.position.set(cur.target.x, 0.2, cur.target.z);
+      beacon.rotation.y += dt * 0.8;
+      const pulse = 0.35 + Math.sin(performance.now() * 0.004) * 0.12;
+      beaconMat.opacity = pulse;
+      const d = Math.hypot(player.pos.x - cur.target.x, player.pos.z - cur.target.z);
+      if (cur.need === 'reach' && d < 7) {
+        m.completeCurrent(player);
+      } else if (cur.need === 'stolenCar' && d < 9) {
+        const inStolen = vehicles.current && vehicles.current.stolen;
+        if (inStolen) m.completeCurrent(player);
+        else if (d < 9 && !vehicles.current) m.setToast('Bawa mobil curian ke sini!', 2);
+      }
+    },
   };
-}
-
-export function currentMission(m) {
-  return m.index < MISSIONS.length ? MISSIONS[m.index] : null;
-}
-
-export function missionTarget(m) {
-  const cur = currentMission(m);
-  if (!cur) return null;
-  return new THREE.Vector3(cur.target[0], 0, cur.target[2]);
-}
-
-export function startMission(m, idx) {
-  m.index = idx; m.done = false; m.phase = 'go'; m.stolenCar = null;
-  const cur = currentMission(m);
-  if (!cur) return;
-  m.beacon.position.set(cur.target[0], 0, cur.target[2]);
-  m.beacon.visible = true;
-  m.sari.visible = cur.id === 'jemput';
-  m.dialog = cur.brief; m.dialogTimer = 7;
-}
-
-// Update misi. state: {playerPos, inCar, car, stolenThisRun, wanted}.
-// cb: {onComplete(mission, reward), onStealNeeded()}. Kembalikan event string.
-export function updateMissions(m, dt, state, cb) {
-  const cur = currentMission(m);
-  if (!cur) return null;
-  m.dialogTimer = Math.max(0, m.dialogTimer - dt);
-  // Denyut beacon.
-  const s = 1 + Math.sin(performance.now() / 300) * 0.15;
-  m.beacon.scale.set(s, 1, s);
-  const t = missionTarget(m);
-  const d = Math.hypot(state.playerPos.x - t.x, state.playerPos.z - t.z);
-  if (cur.needSteal && !m.stolenCar) {
-    if (state.stolenThisRun) {
-      m.stolenCar = state.car;
-      m.dialog = 'Mobil didapat. Sekarang bawa ke garasi Ombak — cepat, sebelum polisi mengepung!';
-      m.dialogTimer = 6;
-    }
-    return null;
-  }
-  if (cur.needCar && !state.inCar) return null;
-  if (d < cur.radius) {
-    const reward = cur.reward;
-    m.index += 1;
-    m.beacon.visible = false;
-    cb.onComplete && cb.onComplete(cur, reward);
-    if (currentMission(m)) {
-      startMission(m, m.index);
-    } else {
-      m.done = true;
-      m.dialog = 'SELESAI — Rio lolos. Utang lunas, Solmar masih miliknya. (Semua misi selesai!)';
-      m.dialogTimer = 12;
-    }
-    return 'complete';
-  }
-  return null;
+  return m;
 }

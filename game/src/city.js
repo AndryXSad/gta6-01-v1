@@ -1,213 +1,209 @@
-// Kota Solmar: grid jalan, gedung low-poly bertekstur jendela prosedural,
-// pelabuhan (kontainer + crane), pantai + laut, highway lingkar, lampu & palem.
-// Prinsip layout: gedung selalu di dalam blok (di antara jalan) supaya jalan
-// tetap bersih untuk mengemudi; trotoar & garis jalan digambar di atas tanah.
-import { CFG } from './config.js';
-import { pick, range, rangeInt } from './random.js';
+// Kota Solmar: grid jalan pusat kota, pelabuhan, pantai + laut, highway
+// lingkar, gedung low-poly, palem, lampu jalan, kontainer. Semua geometri
+// prosedural (Box/Cylinder/Sphere) — tanpa aset eksternal.
+// Mengembalikan objek kota: colliders AABB untuk tabrakan, daftar jalan
+// untuk traffic, dan titik spawn.
+import { CFG, SHOP_NAMES } from './config.js';
+import { range, pick, pickInt } from './random.js';
 
-const THREE = window.THREE;
+const T = () => window.THREE;
 
-function windowTexture(rng, base, lit) {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = base; g.fillRect(0, 0, 64, 128);
-  for (let y = 8; y < 120; y += 14) for (let x = 6; x < 58; x += 14) {
-    g.fillStyle = rng() < 0.35 ? lit : '#2c3e50';
-    g.fillRect(x, y, 9, 10);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+function boxMat(color) {
+  return new T().MeshLambertMaterial({ color });
+}
+
+function addBox(scene, mats, x, y, z, w, h, d, color, ry = 0) {
+  const m = new T().Mesh(new T().BoxGeometry(w, h, d), mats.get(color) || boxMat(color));
+  if (!mats.get(color)) mats.set(color, m.material);
+  m.position.set(x, y, z);
+  m.rotation.y = ry;
+  scene.add(m);
+  return m;
+}
+
+function addCyl(scene, mats, x, y, z, rTop, rBot, h, color, seg = 10) {
+  const m = new T().Mesh(new T().CylinderGeometry(rTop, rBot, h, seg), mats.get(color) || boxMat(color));
+  if (!mats.get(color)) mats.set(color, m.material);
+  m.position.set(x, y, z);
+  scene.add(m);
+  return m;
 }
 
 export function buildCity(scene, rng) {
-  const group = new THREE.Group();
-  const colliders = []; // {x, z, r} kotak gedung untuk tabrakan sederhana
-  const mats = {};
+  const THREE = T();
+  const mats = new Map();
+  const colliders = [];
+  const roads = [];
+  const palms = [];
+  const lamps = [];
+  const C = CFG.colors;
+  const H = CFG.worldHalf;
 
-  // Langit & kabut siang pesisir.
-  scene.background = new THREE.Color(0x8ec9e8);
-  scene.fog = new THREE.Fog(0x9fd0e8, 180, 420);
-  const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x8a7a5a, 0.95);
-  scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff2d0, 1.6);
+  scene.background = new THREE.Color(C.sky);
+  scene.fog = new THREE.Fog(C.fog, 180, 620);
+
+  const sun = new THREE.DirectionalLight(0xfff2d0, 1.15);
   sun.position.set(120, 180, 60);
   scene.add(sun);
+  scene.add(new THREE.AmbientLight(0xbfd9ff, 0.55));
 
-  // Tanah dasar: rumput kota, pasir pantai timur, aspal pelabuhan selatan.
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(560, 560),
-    new THREE.MeshLambertMaterial({ color: 0x7da05c }));
-  ground.rotation.x = -Math.PI / 2; group.add(ground);
-  const sand = new THREE.Mesh(
-    new THREE.PlaneGeometry(80, 560),
-    new THREE.MeshLambertMaterial({ color: 0xe8d5a3 }));
-  sand.rotation.x = -Math.PI / 2; sand.position.set(190, 0.05, 0); group.add(sand);
-  const sea = new THREE.Mesh(
-    new THREE.PlaneGeometry(120, 560),
-    new THREE.MeshLambertMaterial({ color: 0x2e86c1 }));
-  sea.rotation.x = -Math.PI / 2; sea.position.set(290, 0.02, 0); group.add(sea);
-  const portGround = new THREE.Mesh(
-    new THREE.PlaneGeometry(360, 90),
-    new THREE.MeshLambertMaterial({ color: 0x5d6d7e }));
-  portGround.rotation.x = -Math.PI / 2; portGround.position.set(0, 0.04, 165); group.add(portGround);
+  // Tanah dasar + laut selatan/barat + pasir pantai.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(H * 2 + 260, H * 2 + 260),
+    new THREE.MeshLambertMaterial({ color: C.ground }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
 
-  // Jalan: strip aspal di grid + garis tengah putus-putus.
-  const roadMat = new THREE.MeshLambertMaterial({ color: 0x2f3542 });
-  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf5d76e });
-  const walkMat = new THREE.MeshLambertMaterial({ color: 0xb8b0a0 });
-  const half = CFG.cityHalf;
-  for (let i = -2; i <= 2; i++) {
-    const c = i * CFG.block;
-    for (const [w, l, x, z] of [
-      [CFG.road, half * 2 + 40, c, 0], [half * 2 + 40, CFG.road, 0, c],
-    ]) {
-      const r = new THREE.Mesh(new THREE.PlaneGeometry(w, l), roadMat);
-      r.rotation.x = -Math.PI / 2; r.position.set(x, 0.06, z); group.add(r);
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(w + 3, l + 3), walkMat);
-      s.rotation.x = -Math.PI / 2; s.position.set(x, 0.03, z); group.add(s);
-    }
-    // Garis tengah putus-putus di jalan vertikal & horizontal.
-    for (let d = -half; d <= half; d += 12) {
-      const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 4), lineMat);
-      dash.rotation.x = -Math.PI / 2; dash.position.set(c, 0.08, d); group.add(dash);
-      const dash2 = dash.clone(); dash2.rotation.z = Math.PI / 2; dash2.position.set(d, 0.08, c); group.add(dash2);
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 260),
+    new THREE.MeshLambertMaterial({ color: C.sea }));
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.set(0, -0.4, H + 110);
+  scene.add(sea);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(560, 42),
+    new THREE.MeshLambertMaterial({ color: C.sand }));
+  sand.rotation.x = -Math.PI / 2;
+  sand.position.set(0, 0.05, H - 14);
+  scene.add(sand);
+
+  // Jalan grid: strip aspal + garis tengah kuning putus-putus.
+  const roadMat = new THREE.MeshLambertMaterial({ color: C.road });
+  const lineMat = new THREE.MeshLambertMaterial({ color: C.roadLine });
+  const walkMat = new THREE.MeshLambertMaterial({ color: C.sidewalk });
+  for (const x of CFG.gridXs) {
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(CFG.roadWidth, H * 2), roadMat);
+    r.rotation.x = -Math.PI / 2; r.position.set(x, 0.08, 0); scene.add(r);
+    roads.push({ axis: 'z', at: x, from: -H, to: H });
+    for (let z = -H + 10; z < H; z += 22) {
+      const l = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 7), lineMat);
+      l.rotation.x = -Math.PI / 2; l.position.set(x, 0.12, z); scene.add(l);
     }
   }
+  for (const z of CFG.gridZs) {
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, CFG.roadWidth), roadMat);
+    r.rotation.x = -Math.PI / 2; r.position.set(0, 0.08, z); scene.add(r);
+    roads.push({ axis: 'x', at: z, from: -H, to: H });
+    for (let x = -H + 10; x < H; x += 22) {
+      const l = new THREE.Mesh(new THREE.PlaneGeometry(7, 0.7), lineMat);
+      l.rotation.x = -Math.PI / 2; l.position.set(x, 0.12, z); scene.add(l);
+    }
+  }
+  // Highway lingkar utara (lebar, dua jalur).
+  const hw = new THREE.Mesh(new THREE.PlaneGeometry(H * 2, 20),
+    new THREE.MeshLambertMaterial({ color: 0x2e3138 }));
+  hw.rotation.x = -Math.PI / 2; hw.position.set(0, 0.09, -H + 8); scene.add(hw);
+  roads.push({ axis: 'x', at: -H + 8, from: -H, to: H, highway: true });
 
-  // Highway lingkar (cincin jalan di luar kota).
-  const ring = new THREE.Mesh(new THREE.RingGeometry(CFG.highwayR - 6, CFG.highwayR + 6, 64),
-    roadMat);
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; group.add(ring);
-
-  // Gedung: 1-3 per blok, tinggi & warna bervariasi, tekstur jendela.
-  const texA = windowTexture(rng, '#e8dcc0', '#ffe9a8');
-  const texB = windowTexture(rng, '#7fa8c9', '#cfe8ff');
-  const texC = windowTexture(rng, '#d98a6a', '#ffd9a8');
-  const texs = [texA, texB, texC];
-  // Gedung: 1-3 per blok. Blok berpusat DI ANTARA jalan (pusat = kelipatan 40 + 20)
-  // supaya gedung tidak pernah menutupi jalan — mobil bisa melaju di jalan.
-  for (let bx = -3; bx <= 1; bx++) for (let bz = -3; bz <= 1; bz++) {
-    if (bx === 0 && bz === 0) continue; // blok timur laut alun-alun dibiarkan lapang
-    const cx = bx * CFG.block + 20, cz = bz * CFG.block + 20;
-    const n = rangeInt(rng, 1, 3);
-    for (let k = 0; k < n; k++) {
-      const w = range(rng, 10, 16), d = range(rng, 10, 16);
-      const h = range(rng, 9, bx <= -2 || bz <= -2 ? 42 : 26);
-      const x = cx + range(rng, -6, 6), z = cz + range(rng, -6, 6);
-      const mat = new THREE.MeshLambertMaterial({
-        map: pick(rng, texs), color: pick(rng, CFG.palette),
-      });
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      b.position.set(x, h / 2, z); group.add(b);
-      // Atap: AC box kecil.
-      const ac = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 2),
-        new THREE.MeshLambertMaterial({ color: 0x666666 }));
-      ac.position.set(x + w / 4, h + 0.5, z); group.add(ac);
-      colliders.push({ x, z, hw: w / 2 + 0.6, hd: d / 2 + 0.6 });
+  // Gedung: blok di antara jalan grid, tinggi acak, atap warna-warni,
+  // papan nama toko orisinal di beberapa blok.
+  const roofPalette = [C.roofA, C.roofB, C.roofC, C.roofD];
+  const wallPalette = [C.wallA, C.wallB, C.wallC];
+  let shopIdx = 0;
+  for (const gx of CFG.gridXs) {
+    for (const gz of CFG.gridZs) {
+      const cx = gx + 30, cz = gz + 30;
+      if (cx > H - 40 || cz > H - 60) continue;
+      if (rng() < 0.18) { // taman kecil / alun-alun
+        const g = new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
+          new THREE.MeshLambertMaterial({ color: C.grass }));
+        g.rotation.x = -Math.PI / 2; g.position.set(cx, 0.07, cz); scene.add(g);
+        for (let p = 0; p < 3; p++) {
+          const px = cx + range(rng, -16, 16), pz = cz + range(rng, -16, 16);
+          addCyl(scene, mats, px, 2.2, pz, 0.5, 0.7, 4.4, C.trunk, 7);
+          const crown = new THREE.Mesh(new THREE.SphereGeometry(2.6, 8, 6),
+            mats.get(C.palm) || boxMat(C.palm));
+          if (!mats.get(C.palm)) mats.set(C.palm, crown.material);
+          crown.position.set(px, 5.4, pz); scene.add(crown);
+          palms.push({ x: px, z: pz });
+        }
+        continue;
+      }
+      const w = range(rng, 18, 30), d = range(rng, 18, 30), h = range(rng, 12, 52);
+      const wall = pick(rng, wallPalette), roof = pick(rng, roofPalette);
+      addBox(scene, mats, cx, h / 2, cz, w, h, d, wall);
+      addBox(scene, mats, cx, h + 0.8, cz, w + 1.2, 1.6, d + 1.2, roof);
+      // Jendela: strip gelap di sisi depan.
+      addBox(scene, mats, cx, h * 0.55, cz + d / 2 + 0.15, w * 0.7, h * 0.5, 0.3, 0x2b3a4a);
+      colliders.push({ x: cx, z: cz, hx: w / 2 + 1, hz: d / 2 + 1 });
+      if (rng() < 0.5) {
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.2),
+          new THREE.MeshBasicMaterial({ color: pick(rng, [0x1f6f8b, 0x8b1f2d, 0x2d6a4f]) }));
+        sign.position.set(cx, 4.2, cz + d / 2 + 0.35);
+        scene.add(sign);
+        shopIdx++;
+      }
     }
   }
 
-  // Alun-alun pusat: air mancur + bangku.
-  const fountain = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 1.2, 16),
-    new THREE.MeshLambertMaterial({ color: 0x95a5a6 }));
-  fountain.position.set(0, 0.6, 0); group.add(fountain);
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 0.4, 16),
-    new THREE.MeshLambertMaterial({ color: 0x3498db }));
-  water.position.set(0, 1.1, 0); group.add(water);
-  colliders.push({ x: 0, z: 0, hw: 7, hd: 7 });
-
-  // Pelabuhan: kontainer warna-warni + crane + gudang.
-  const contColors = [0xc0392b, 0x2980b9, 0x27ae60, 0xe67e22, 0x8e44ad];
-  for (let i = 0; i < 26; i++) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 3),
-      new THREE.MeshLambertMaterial({ color: pick(rng, contColors) }));
-    const x = range(rng, -120, 120), z = range(rng, 138, 185);
-    c.position.set(x, 1.5 + (rng() < 0.3 ? 3 : 0), z);
-    c.rotation.y = rng() < 0.5 ? 0 : Math.PI / 2;
-    group.add(c);
-    colliders.push({ x, z, hw: 4.5, hd: 4.5 });
+  // Pelabuhan barat-daya: dermaga beton, kontainer warna-warni, crane.
+  const pier = new THREE.Mesh(new THREE.PlaneGeometry(150, 90),
+    new THREE.MeshLambertMaterial({ color: C.harbor }));
+  pier.rotation.x = -Math.PI / 2; pier.position.set(-195, 0.1, 150); scene.add(pier);
+  const contPalette = [C.containerA, C.containerB, C.containerC, C.containerD];
+  for (let i = 0; i < 16; i++) {
+    const cx = -240 + (i % 4) * 26 + range(rng, -4, 4);
+    const cz = 115 + Math.floor(i / 4) * 24 + range(rng, -3, 3);
+    const stacked = rng() < 0.4;
+    addBox(scene, mats, cx, 1.4, cz, 20, 2.8, 7, pick(rng, contPalette));
+    if (stacked) addBox(scene, mats, cx, 4.2, cz, 20, 2.8, 7, pick(rng, contPalette));
+    colliders.push({ x: cx, z: cz, hx: 11, hz: 4.5 });
   }
-  for (const cx of [-60, 0, 60]) {
-    const crane = new THREE.Group();
-    const legMat = new THREE.MeshLambertMaterial({ color: 0xf39c12 });
-    for (const [lx, lz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 26, 1.2), legMat);
-      leg.position.set(lx, 13, lz); crane.add(leg);
-    }
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(30, 1.5, 1.5), legMat);
-    arm.position.set(8, 26, 0); crane.add(arm);
-    crane.position.set(cx, 0, 158); group.add(crane);
-    colliders.push({ x: cx, z: 158, hw: 5, hd: 5 });
-  }
-  const warehouse = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 16),
-    new THREE.MeshLambertMaterial({ color: 0x95a5a6 }));
-  warehouse.position.set(-90, 5, 150); group.add(warehouse);
-  colliders.push({ x: -90, z: 150, hw: 16, hd: 9 });
+  // Crane pelabuhan (dua tiang + lengan).
+  addBox(scene, mats, -180, 14, 120, 2, 28, 2, 0xd4ac0d);
+  addBox(scene, mats, -180, 14, 140, 2, 28, 2, 0xd4ac0d);
+  addBox(scene, mats, -180, 27, 130, 2, 2, 44, 0xd4ac0d);
+  colliders.push({ x: -180, z: 130, hx: 3, hz: 12 });
 
-  // Pantai: palem + payung + kursi.
-  const palmTrunk = new THREE.MeshLambertMaterial({ color: 0x8a6d3b });
-  const palmLeaf = new THREE.MeshLambertMaterial({ color: 0x27ae60 });
-  for (let i = 0; i < 18; i++) {
-    const x = range(rng, 132, 165), z = range(rng, -140, 140);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 7, 6), palmTrunk);
-    trunk.position.set(x, 3.5, z); trunk.rotation.z = range(rng, -0.12, 0.12); group.add(trunk);
-    for (let l = 0; l < 5; l++) {
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.9, 4, 4), palmLeaf);
-      leaf.position.set(x, 7.2, z);
-      leaf.rotation.set(range(rng, 0.6, 1.2), l * 1.26, 0);
-      group.add(leaf);
+  // Palem di boulevard pantai + lampu jalan di tiap persimpangan grid.
+  for (let x = -200; x <= 200; x += 40) {
+    const px = x + range(rng, -6, 6);
+    addCyl(scene, mats, px, 2.2, 196, 0.5, 0.7, 4.4, C.trunk, 7);
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4.5, 8),
+      mats.get(C.palm) || boxMat(C.palm));
+    if (!mats.get(C.palm)) mats.set(C.palm, crown.material);
+    crown.position.set(px, 6.2, 196); scene.add(crown);
+    palms.push({ x: px, z: 196 });
+  }
+  for (const gx of CFG.gridXs) {
+    for (const gz of CFG.gridZs) {
+      if (rng() < 0.55) continue;
+      addCyl(scene, mats, gx + 8, 3, gz + 8, 0.18, 0.18, 6, 0x222222, 6);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffe9a8 }));
+      bulb.position.set(gx + 8, 6.1, gz + 8); scene.add(bulb);
+      lamps.push({ x: gx + 8, z: gz + 8 });
     }
   }
-  for (let i = 0; i < 8; i++) {
-    const x = range(rng, 140, 168), z = range(rng, -120, 120);
-    const umb = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.2, 8),
-      new THREE.MeshLambertMaterial({ color: pick(rng, [0xe74c3c, 0xf1c40f, 0x3498db]) }));
-    umb.position.set(x, 2.2, z); group.add(umb);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6), palmTrunk);
-    pole.position.set(x, 1.2, z); group.add(pole);
-  }
 
-  // Lampu jalan di tiap persimpangan + rambu nama jalan (sprite teks).
-  const lampMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
-  const lampGlow = new THREE.MeshBasicMaterial({ color: 0xffe9a8 });
-  for (let ix = -2; ix <= 2; ix++) for (let iz = -2; iz <= 2; iz++) {
-    const x = ix * CFG.block + 6, z = iz * CFG.block + 6;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 6, 6), lampMat);
-    pole.position.set(x, 3, z); group.add(pole);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), lampGlow);
-    bulb.position.set(x, 6.1, z); group.add(bulb);
-  }
-
-  // Pickup kesehatan & armor tersebar di kota.
+  // Pickup kesehatan & armor tersebar (kotak bercahaya, dipakai player.js).
   const pickups = [];
-  const mkPickup = (x, z, kind) => {
-    const m = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 1.4, 1.4),
-      new THREE.MeshLambertMaterial({ color: kind === 'health' ? 0x2ecc71 : 0x3498db, emissive: 0x222222 }));
-    m.position.set(x, 1.2, z); m.rotation.y = Math.PI / 4;
-    group.add(m);
-    pickups.push({ mesh: m, x, z, kind, taken: false });
-  };
-  for (let i = 0; i < 6; i++) mkPickup(range(rng, -100, 100), range(rng, -100, 100), 'health');
-  for (let i = 0; i < 4; i++) mkPickup(range(rng, -100, 100), range(rng, -100, 100), 'armor');
-
-  scene.add(group);
-  return { group, colliders, pickups };
-}
-
-// Tabrakan kotak sederhana (gedung/kontainer): geser posisi keluar dari kotak.
-export function collideCircle(pos, r, colliders) {
-  for (const c of colliders) {
-    const dx = pos.x - c.x, dz = pos.z - c.z;
-    if (Math.abs(dx) < c.hw + r && Math.abs(dz) < c.hd + r) {
-      const px = c.hw + r - Math.abs(dx), pz = c.hd + r - Math.abs(dz);
-      if (px < pz) pos.x = c.x + Math.sign(dx || 1) * (c.hw + r);
-      else pos.z = c.z + Math.sign(dz || 1) * (c.hd + r);
-    }
+  const pickupSpots = [
+    { x: 30, z: 30, kind: 'health' }, { x: -90, z: 90, kind: 'armor' },
+    { x: 150, z: -90, kind: 'health' }, { x: -150, z: -150, kind: 'armor' },
+    { x: 60, z: 205, kind: 'health' }, { x: -190, z: 150, kind: 'armor' },
+  ];
+  for (const p of pickupSpots) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6),
+      new THREE.MeshBasicMaterial({ color: p.kind === 'health' ? 0x2ecc71 : 0x3498db }));
+    mesh.position.set(p.x, 1.2, p.z);
+    scene.add(mesh);
+    pickups.push({ ...p, mesh, taken: false, timer: 0 });
   }
-  // Batas dunia: jangan lari ke laut / luar highway.
-  const lim = CFG.highwayR + 30;
-  pos.x = Math.max(-lim, Math.min(lim, pos.x));
-  pos.z = Math.max(-lim, Math.min(lim, pos.z));
+
+  return {
+    colliders, roads, palms, lamps, pickups,
+    shopCount: shopIdx,
+    bounds: H,
+    // Tabrakan sederhana: kembalikan true bila titik (x,z) menabrak gedung.
+    hitsBuilding(x, z, pad = 0.8) {
+      for (const c of colliders) {
+        if (Math.abs(x - c.x) < c.hx + pad && Math.abs(z - c.z) < c.hz + pad) return true;
+      }
+      return false;
+    },
+    clampToWorld(x, z) {
+      return {
+        x: Math.max(-H + 4, Math.min(H - 4, x)),
+        z: Math.max(-H + 4, Math.min(H - 4, z)),
+      };
+    },
+  };
 }

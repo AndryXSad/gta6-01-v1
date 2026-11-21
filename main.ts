@@ -6,6 +6,9 @@
 // MAKEFUN_OUTPUT_DIR menggantikan /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 // Mainkan lokal dengan `node serve.ts`, lalu buka http://localhost:8080.
+//
+// Ditulis ulang untuk rebuild terekam 21 Nov 2026: isi fungsional sama dengan
+// starter (salin + dossier), penamaan & komentar ditulis sendiri di sesi ini.
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

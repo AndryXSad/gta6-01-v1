@@ -1,103 +1,99 @@
-// Mode screenshot deterministik: ?shot=chase|city|mission|police & ?seed=1.
-// Menyiapkan posisi pemain/polisi/misi + sudut kamera agar tiap screenshot
-// menunjukkan sistem game yang berbeda — render asli dari kode game, tanpa edit.
+// Mode screenshot deterministik Solmar: ?shot=chase|city|mission|police&seed=N
+// Menata adegan (posisi pemain, mobil, wanted, misi aktif) lalu membekukan
+// simulasi supaya tiap screenshot bisa diulang persis. Dipakai main.js
+// sebelum loop pertama; saat shot aktif, input & HUD menu dimatikan.
+import { CFG } from './config.js';
+import { hashSeed, mulberry32 } from './random.js';
+
 export function parseShot() {
-  const q = new URLSearchParams(location.search);
+  const q = new URLSearchParams(window.location.search);
   const shot = q.get('shot');
-  const seed = parseInt(q.get('seed') || '1', 10) || 1;
-  return { shot, seed };
+  if (!shot) return null;
+  const seed = Number(q.get('seed') || '1') || 1;
+  return { shot, seed, rng: mulberry32(hashSeed(`solmar-${shot}-${seed}`)) };
 }
 
-// Terapkan setup shot ke state game. Dipanggil sekali setelah dunia dibangun,
-// sebelum loop pertama. Mengembalikan {camYaw, camPitch} untuk kamera.
-export function applyShot(shot, S) {
-  if (!shot) return null;
-  const P = S.player, V = S.vehicles, T = S.traffic, POL = S.police, M = S.missions;
-  const putInCar = (car, x, z, heading, speed) => {
-    car.parked = false; car.stolen = true;
-    car.mesh.position.set(x, 0, z); car.heading = heading; car.mesh.rotation.y = heading;
-    car.speed = speed;
-    S.setCar(car); P.inCar = true;
-    P.pos.set(x, 0, z);
-  };
-  const placePolice = (n, x, z) => {
-    // Patroli mengejar dari belakang (arah +z), berbaris agar tidak menabrak pemain.
-    for (let i = 0; i < n; i++) {
-      const mesh = POL.cars[i] ? POL.cars[i].mesh : null;
-      if (!mesh) break;
-      mesh.position.set(x + (i % 2 === 0 ? -5 : 5), 0, z + 16 + i * 10);
-      mesh.rotation.y = Math.PI;
-    }
+// Posisikan dunia untuk tiap shot. Mengembalikan {frozen:true} bila shot
+// dikenali — main.js lalu merender beberapa frame lalu berhenti update.
+export function applyShot(game, info) {
+  const { shot } = info;
+  const { player, vehicles, police, missions, traffic, city } = game;
+  const setPlayer = (x, z, heading) => {
+    player.pos.set(x, 0, z);
+    player.heading = heading;
+    player.camYaw = heading + Math.PI;
+    player.group.position.copy(player.pos);
+    player.group.rotation.y = heading;
   };
   if (shot === 'chase') {
-    // Kejar-kejaran: Rio di mobil curian, wanted 3, 2 patroli di belakang, misi 2 aktif.
-    const car = V.parked[2];
-    putInCar(car, 0, 70, Math.PI, 18);
-    S.missions.index = 1;
-    const { startMission } = S.fns;
-    startMission(M, 1);
-    S.missions.stolenCar = car; // sudah dicuri — objektif langsung "bawa ke garasi"
-    S.addWanted(3);
-    placePolice(2, 0, 88);
-    S.state.cash = 350;
-    // Kamera dari depan-samping: mobil melaju ke arah kamera, patroli mengejar di belakangnya.
-    return { camYaw: 0.45, camPitch: 1.0 };
+    // Cover: Rio mengemudi dikejar 2 patroli, wanted 3, misi getaway aktif.
+    missions.index = 3;
+    const car = vehicles.heroCar;
+    vehicles.enterCar(car, player);
+    car.pos.set(-20, 0, -140);
+    car.heading = Math.PI;
+    car.speed = 26;
+    car.group.position.copy(car.pos);
+    car.group.rotation.y = car.heading;
+    player.camYaw = Math.PI;
+    police.addHeat(60, 'shot-chase');
+    police.syncUnits();
+    police.patrols.forEach((p, i) => {
+      p.pos.set(-20 + (i === 0 ? -7 : 8), 0, -140 + 26 + i * 10);
+      p.heading = Math.PI;
+      p.speed = 22;
+    });
+    missions.setToast('Getaway Terakhir: lolos lewat highway utara!', 99);
+    return { frozen: true, note: 'chase' };
   }
   if (shot === 'city') {
-    // Jalan kaki di pusat kota: traffic + pejalan kaki + gedung di sekeliling.
-    P.pos.set(14, 0, 26); P.heading = Math.PI * 0.75;
-    T.peds.slice(0, 8).forEach((p, i) => {
-      p.x = 14 + Math.sin(i * 1.3) * (6 + i); p.z = 26 + Math.cos(i * 0.9) * (5 + i * 0.5);
+    // Rio jalan kaki di pusat kota, traffic + pejalan kaki di sekitar.
+    setPlayer(6, 6, Math.PI * 0.75);
+    missions.index = 0;
+    traffic.peds.slice(0, 6).forEach((p, i) => {
+      p.pos.set(10 + i * 5, 0, 14 + (i % 2) * 6);
+      p.group.position.copy(p.pos);
     });
-    T.cars.slice(0, 4).forEach((c, i) => {
-      c.mesh.position.set(-20 + i * 14, 0, 40 - i * 6);
-      c.mesh.rotation.y = Math.PI / 2;
+    traffic.cars.slice(0, 4).forEach((c, i) => {
+      c.pos.set(-30 + i * 22, 0, 0);
+      c.heading = -Math.PI / 2;
+      c.group.rotation.y = c.heading;
     });
-    return { camYaw: Math.PI * 0.75, camPitch: 0.5 };
+    return { frozen: true, note: 'city' };
   }
   if (shot === 'mission') {
-    // Momen misi 1: Rio di pelabuhan, beacon kuning + dialog Kestrel di HUD.
-    // Kamera di utara pemain, menghadap selatan ke beacon & kontainer.
-    P.pos.set(-6, 0, 132); P.heading = 0;
-    M.index = 0;
-    S.fns.startMission(M, 0);
-    S.state.cash = 50;
-    return { camYaw: 0, camPitch: 1 };
+    // Momen misi 1: Rio tiba di pelabuhan, beacon + dialog Kestrel.
+    setPlayer(-168, 132, Math.PI * 0.9);
+    missions.index = 0;
+    missions.setToast('Paket Pelabuhan: antar paket ke dermaga barat.', 99);
+    traffic.cars.slice(0, 2).forEach((c, i) => {
+      c.pos.set(-150 + i * 18, 0, 120);
+      c.heading = Math.PI / 2;
+      c.group.rotation.y = c.heading;
+    });
+    return { frozen: true, note: 'mission' };
   }
   if (shot === 'police') {
-    // Polisi mengejar: wanted 4, patroli + petugas jalan kaki mengepung Rio.
-    // Rio di persimpangan jalan (0,-40) — kamera bebas gedung dari sudut ini.
-    P.pos.set(0, 0, -40); P.heading = Math.PI * 0.25;
-    S.addWanted(4);
-    placePolice(3, 0, -24);
-    POL.cops.forEach((c, i) => {
-      c.mesh.position.set((i - 1) * 6, 0, -48);
+    // Polisi mengejar Rio jalan kaki di plaza, wanted 2.
+    setPlayer(0, -10, 0);
+    missions.index = 1;
+    police.addHeat(30, 'shot-police');
+    police.syncUnits();
+    police.officers.forEach((o, i) => {
+      o.pos.set(-12 + i * 9, 0, -26);
+      o.group.position.copy(o.pos);
     });
-    S.state.health = 62;
-    return { camYaw: Math.PI * 0.25, camPitch: 0.5 };
+    police.patrols.forEach((p, i) => {
+      p.pos.set(14 + i * 10, 0, -34);
+      p.heading = Math.PI;
+      p.speed = 8;
+    });
+    missions.setToast('Wanted ★★ — polisi mengejar!', 99);
+    return { frozen: true, note: 'police' };
   }
   return null;
 }
 
-// Setelah pre-roll: posisikan polisi relatif terhadap posisi AKHIR pemain,
-// supaya patroli terlihat mengejar di dalam frame (kamera ada di belakang pemain).
-export function afterPreroll(shot, S) {
-  const P = S.player, POL = S.police;
-  if (shot === 'chase') {
-    const px = P.pos.x, pz = P.pos.z;
-    POL.cars.forEach((c, i) => {
-      c.mesh.position.set(px + (i === 0 ? -7 : 7), 0, pz + 16 + i * 9);
-      c.mesh.rotation.y = Math.PI;
-    });
-  }
-  if (shot === 'police') {
-    const px = P.pos.x, pz = P.pos.z;
-    POL.cars.forEach((c, i) => {
-      c.mesh.position.set(px + (i === 0 ? -9 : 9), 0, pz + 13 + i * 8);
-      c.mesh.rotation.y = Math.PI * 0.25;
-    });
-    POL.cops.forEach((c, i) => {
-      c.mesh.position.set(px + (i - 1) * 5, 0, pz + 7);
-    });
-  }
-}
+// Nama file screenshot yang diharapkan (cocok shots.json di repo).
+export const SHOT_FILES = ['1-chase.jpg', '2-city.jpg', '3-mission.jpg', '4-police.jpg'];
+export const SHOT_NAMES = ['chase', 'city', 'mission', 'police'];

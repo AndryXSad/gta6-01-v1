@@ -1,72 +1,106 @@
-// Suara tersintesis WebAudio — tanpa file eksternal. Semua efek dibuat dari
-// osilator & noise buffer saat runtime. AudioContext dibuat pas gestur pertama.
-// Sirene memakai interval supaya dua nadanya bergantian seperti patroli sungguhan.
-let ctx = null, engineOsc = null, engineGain = null, sirenTimer = null, sirenOn = false;
+// Suara Solmar: semua tersintesis WebAudio (oscillator + noise), tanpa
+// file eksternal. AudioContext dibuat lazily saat interaksi pertama
+// (aturan autoplay browser) — aman dipanggil sebelum itu.
+export function createAudio() {
+  let ctx = null;
+  let engineOsc = null;
+  let engineGain = null;
+  let sirenOn = false;
+  let sirenOsc = null;
+  let sirenGain = null;
+  let sirenTimer = 0;
 
-export function ensureAudio() {
-  if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
-  try {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    engineOsc = ctx.createOscillator();
-    engineGain = ctx.createGain();
-    engineOsc.type = 'sawtooth';
-    engineOsc.frequency.value = 55;
-    engineGain.gain.value = 0;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 420;
-    engineOsc.connect(lp); lp.connect(engineGain); engineGain.connect(ctx.destination);
-    engineOsc.start();
-  } catch (e) { ctx = null; }
-}
+  function ensure() {
+    if (ctx) return ctx;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+    } catch {
+      ctx = null;
+    }
+    return ctx;
+  }
 
-export function engineSound(speed01, driving) {
-  if (!ctx || !engineOsc) return;
-  const t = ctx.currentTime;
-  engineGain.gain.setTargetAtTime(driving ? 0.03 + speed01 * 0.05 : 0, t, 0.1);
-  engineOsc.frequency.setTargetAtTime(50 + speed01 * 130, t, 0.08);
-}
+  function beep(freq, dur, type = 'sine', vol = 0.12, slideTo = 0) {
+    const c = ensure();
+    if (!c) return;
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, c.currentTime);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, c.currentTime + dur);
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    o.connect(g).connect(c.destination);
+    o.start();
+    o.stop(c.currentTime + dur + 0.02);
+  }
 
-function blip(freq, dur, type, vol, slideTo) {
-  if (!ctx) return;
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = type || 'sine'; o.frequency.value = freq;
-  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ctx.currentTime + dur);
-  g.gain.setValueAtTime(vol || 0.12, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-  o.connect(g); g.connect(ctx.destination);
-  o.start(); o.stop(ctx.currentTime + dur);
-}
+  function noiseBurst(dur, vol = 0.15, freq = 800) {
+    const c = ensure();
+    if (!c) return;
+    const len = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.value = vol;
+    src.connect(f).connect(g).connect(c.destination);
+    src.start();
+  }
 
-function noiseBurst(dur, vol, freq) {
-  if (!ctx) return;
-  const len = Math.floor(ctx.sampleRate * dur);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq || 900;
-  const g = ctx.createGain(); g.gain.value = vol || 0.2;
-  src.connect(f); f.connect(g); g.connect(ctx.destination); src.start();
-}
+  return {
+    unlock() { ensure(); },
+    pickup() { beep(660, 0.12, 'sine', 0.14); setTimeout(() => beep(880, 0.16, 'sine', 0.14), 90); },
+    missionDone() { [523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.22, 'triangle', 0.16), i * 130)); },
+    punch() { noiseBurst(0.09, 0.2, 500); },
+    gunshot() { noiseBurst(0.12, 0.22, 2400); beep(160, 0.1, 'square', 0.1, 60); },
+    steal() { beep(220, 0.18, 'sawtooth', 0.1, 440); },
+    crash() { noiseBurst(0.25, 0.25, 300); },
+    busted() { beep(440, 0.4, 'sawtooth', 0.14, 110); },
 
-export const sfx = {
-  punch() { noiseBurst(0.12, 0.25, 500); blip(120, 0.1, 'square', 0.1, 60); },
-  pickup() { blip(660, 0.12, 'sine', 0.14, 990); },
-  cash() { blip(880, 0.1, 'triangle', 0.14); setTimeout(() => blip(1320, 0.14, 'triangle', 0.14), 90); },
-  mission() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => blip(f, 0.22, 'triangle', 0.15), i * 110)); },
-  shot() { noiseBurst(0.09, 0.3, 2400); },
-  hurt() { blip(180, 0.18, 'sawtooth', 0.16, 90); },
-  steal() { blip(300, 0.15, 'square', 0.1, 520); },
-  busted() { blip(220, 0.5, 'sawtooth', 0.18, 110); },
-  door() { noiseBurst(0.08, 0.15, 700); },
-};
+    engine(speedNorm) {
+      const c = ensure();
+      if (!c) return;
+      if (!engineOsc) {
+        engineOsc = c.createOscillator();
+        engineGain = c.createGain();
+        engineOsc.type = 'sawtooth';
+        engineGain.gain.value = 0;
+        engineOsc.connect(engineGain).connect(c.destination);
+        engineOsc.start();
+      }
+      engineOsc.frequency.value = 55 + speedNorm * 165;
+      engineGain.gain.value = speedNorm > 0.02 ? 0.045 + speedNorm * 0.05 : 0;
+    },
 
-// Sirene dua nada (polisi) — interval bergantian 660/880 Hz.
-export function setSiren(on) {
-  if (on === sirenOn) return;
-  sirenOn = on;
-  if (on && ctx) {
-    let hi = false;
-    sirenTimer = setInterval(() => { hi = !hi; blip(hi ? 880 : 660, 0.42, 'sine', 0.05); }, 430);
-  } else if (sirenTimer) { clearInterval(sirenTimer); sirenTimer = null; }
+    // Sirene naik-turun dua nada saat wanted ≥1.
+    siren(dt, wanted) {
+      const c = ensure();
+      if (!c) return;
+      if (wanted <= 0) {
+        if (sirenGain) sirenGain.gain.value = 0;
+        sirenOn = false;
+        return;
+      }
+      if (!sirenOsc) {
+        sirenOsc = c.createOscillator();
+        sirenGain = c.createGain();
+        sirenOsc.type = 'sine';
+        sirenGain.gain.value = 0;
+        sirenOsc.connect(sirenGain).connect(c.destination);
+        sirenOsc.start();
+      }
+      sirenTimer += dt;
+      const twoTone = Math.sin(sirenTimer * 2.4) > 0 ? 720 : 540;
+      sirenOsc.frequency.value = twoTone;
+      sirenGain.gain.value = 0.028;
+      sirenOn = true;
+    },
+  };
 }
