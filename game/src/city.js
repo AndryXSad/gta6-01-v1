@@ -9,7 +9,7 @@ import { range, pick, pickInt } from './random.js';
 const T = () => window.THREE;
 
 function boxMat(color) {
-  return new T().MeshLambertMaterial({ color });
+  return new (T()).MeshLambertMaterial({ color });
 }
 
 // Material di-cache per warna supaya gedung yang sewarna berbagi material
@@ -21,7 +21,8 @@ function cachedMat(mats, color) {
 }
 
 function addBox(scene, mats, x, y, z, w, h, d, color, ry = 0) {
-  const m = new T().Mesh(new T().BoxGeometry(w, h, d), cachedMat(mats, color));
+  const THREE = T();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cachedMat(mats, color));
   m.position.set(x, y, z);
   m.rotation.y = ry;
   scene.add(m);
@@ -29,7 +30,8 @@ function addBox(scene, mats, x, y, z, w, h, d, color, ry = 0) {
 }
 
 function addCyl(scene, mats, x, y, z, rTop, rBot, h, color, seg = 10) {
-  const m = new T().Mesh(new T().CylinderGeometry(rTop, rBot, h, seg), cachedMat(mats, color));
+  const THREE = T();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg), cachedMat(mats, color));
   m.position.set(x, y, z);
   scene.add(m);
   return m;

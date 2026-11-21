@@ -25,6 +25,14 @@ export function applyShot(game, info) {
     player.group.position.copy(player.pos);
     player.group.rotation.y = heading;
   };
+  // Beacon & ring mengikuti misi aktif (di mode beku missions.update tidak
+  // jalan, jadi penanda harus diposisikan manual di sini).
+  const placeBeacon = () => {
+    const cur = missions.current();
+    if (!cur) return;
+    missions.beacon.position.set(cur.target.x, 15, cur.target.z);
+    missions.ring.position.set(cur.target.x, 0.2, cur.target.z);
+  };
   if (shot === 'chase') {
     // Cover: Rio mengemudi dikejar 2 patroli, wanted 3, misi getaway aktif.
     // Mobil pemain di highway utara (z -140) menghadap selatan (+z) supaya
@@ -37,14 +45,23 @@ export function applyShot(game, info) {
     car.speed = 26;
     car.group.position.copy(car.pos);
     car.group.rotation.y = car.heading;
+    // Kamera mengikuti player.pos — di mode beku vehicles.update tidak
+    // jalan, jadi sinkronkan posisi pemain ke mobil secara manual.
+    player.pos.copy(car.pos);
+    player.heading = car.heading;
     player.camYaw = Math.PI;
     police.addHeat(60, 'shot-chase');
     police.syncUnits();
+    // Patroli di sisi depan mobil (dalam frame kamera yang melihat ke
+    // selatan) — seolah memotong jalur pelarian dari arah depan.
     police.patrols.forEach((p, i) => {
-      p.pos.set(-20 + (i === 0 ? -7 : 8), 0, -140 + 26 + i * 10);
-      p.heading = Math.PI;
+      p.pos.set(-20 + (i === 0 ? -9 : 10), 0, -140 + 30 + i * 12);
+      p.heading = 0;
       p.speed = 22;
+      p.group.position.copy(p.pos);
+      p.group.rotation.y = p.heading;
     });
+    placeBeacon();
     missions.setToast('Getaway Terakhir: lolos lewat highway utara!', 99);
     return { frozen: true, note: 'chase' };
   }
@@ -52,6 +69,7 @@ export function applyShot(game, info) {
     // Rio jalan kaki di pusat kota, traffic + pejalan kaki di sekitar.
     setPlayer(6, 6, Math.PI * 0.75);
     missions.index = 0;
+    placeBeacon();
     traffic.peds.slice(0, 6).forEach((p, i) => {
       p.pos.set(10 + i * 5, 0, 14 + (i % 2) * 6);
       p.group.position.copy(p.pos);
@@ -64,9 +82,12 @@ export function applyShot(game, info) {
     return { frozen: true, note: 'city' };
   }
   if (shot === 'mission') {
-    // Momen misi 1: Rio tiba di pelabuhan, beacon + dialog Kestrel.
-    setPlayer(-168, 132, Math.PI * 0.9);
+    // Momen misi 1: Rio di tepi dermaga terbuka menghadap tumpukan kontainer
+    // + beacon pelabuhan. Kamera di belakang (timur) melihat ke barat.
+    setPlayer(-140, 150, Math.PI / 2);
+    player.camYaw = Math.PI / 2;
     missions.index = 0;
+    placeBeacon();
     missions.setToast('Paket Pelabuhan: antar paket ke dermaga barat.', 99);
     traffic.cars.slice(0, 2).forEach((c, i) => {
       c.pos.set(-150 + i * 18, 0, 120);
@@ -76,19 +97,24 @@ export function applyShot(game, info) {
     return { frozen: true, note: 'mission' };
   }
   if (shot === 'police') {
-    // Polisi mengejar Rio jalan kaki di plaza, wanted 2.
+    // Polisi mengejar Rio jalan kaki di plaza, wanted 2. Kamera di selatan
+    // pemain (camYaw 0) melihat ke utara: petugas & patroli di depan frame.
     setPlayer(0, -10, 0);
+    player.camYaw = 0;
     missions.index = 1;
+    placeBeacon();
     police.addHeat(30, 'shot-police');
     police.syncUnits();
     police.officers.forEach((o, i) => {
-      o.pos.set(-12 + i * 9, 0, -26);
+      o.pos.set(-8 + i * 9, 0, -30);
       o.group.position.copy(o.pos);
     });
     police.patrols.forEach((p, i) => {
-      p.pos.set(14 + i * 10, 0, -34);
+      p.pos.set(16 + i * 12, 0, -36);
       p.heading = Math.PI;
       p.speed = 8;
+      p.group.position.copy(p.pos);
+      p.group.rotation.y = p.heading;
     });
     missions.setToast('Wanted ★★ — polisi mengejar!', 99);
     return { frozen: true, note: 'police' };
