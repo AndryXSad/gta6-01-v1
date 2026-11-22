@@ -1,6 +1,6 @@
-// Solmar HUD — health bar, cash, wanted stars, city clock, objective text and
-// toasts, plus a 2D top-down minimap (roads, sea, player, police, traffic and
-// the mission marker). All DOM nodes already exist in index.html.
+// SOLMAR HUD — health bar, cash, wanted stars, city clock, objective text
+// and toasts, plus a 2D top-down minimap (roads, sea, player, police,
+// traffic and the mission marker). All DOM nodes already exist in index.html.
 import { WORLD } from './config.js';
 
 export function createHud() {
@@ -58,7 +58,7 @@ export function updateHud(hud, dt, state) {
 }
 
 export function drawMinimap(hud, world) {
-  // world: {playerX, playerZ, heading, inCar, target, police: [{x,z}], traffic: [{x,z}], peds: [{x,z}]}
+  // world: {playerX, playerZ, heading, inCar, target, police: [{x,z}], traffic: [{x,z}]}
   const c = hud.minimap;
   if (!c) return;
   const g = c.getContext('2d');
@@ -69,15 +69,14 @@ export function drawMinimap(hud, world) {
   g.clearRect(0, 0, W, H);
   g.fillStyle = '#274d33';
   g.fillRect(0, 0, W, H);
-  // sea
+  // sea + sand at the south edge
   const [, seaY] = toMap(0, WORLD.waterAt);
   g.fillStyle = '#2a6f9e';
   g.fillRect(0, 0, W, seaY);
-  // sand
   g.fillStyle = '#d9c28a';
   const [, sandY] = toMap(0, WORLD.beachAt);
   g.fillRect(0, seaY, W, sandY - seaY);
-  // roads
+  // road grid
   g.strokeStyle = '#55595e';
   g.lineWidth = 3;
   for (let x = -207; x <= 207; x += WORLD.roadGap) {
@@ -101,7 +100,7 @@ export function drawMinimap(hud, world) {
   const [ccx, ccy] = toMap(0, 0);
   g.arc(ccx, ccy, (WORLD.highwayRadius / WORLD.size) * W, 0, Math.PI * 2);
   g.stroke();
-  // mission target
+  // mission target marker
   if (world.target) {
     const [tx, ty] = toMap(world.target[0], world.target[1]);
     g.fillStyle = '#ffd60a';
@@ -118,7 +117,7 @@ export function drawMinimap(hud, world) {
     const [tx, ty] = toMap(t.x, t.z);
     g.fillRect(tx - 1, ty - 1, 2, 2);
   }
-  // police
+  // police dots
   g.fillStyle = '#3a86ff';
   for (const p of world.police || []) {
     const [px, py] = toMap(p.x, p.z);
@@ -126,11 +125,11 @@ export function drawMinimap(hud, world) {
     g.arc(px, py, 3, 0, Math.PI * 2);
     g.fill();
   }
-  // player arrow (rotates with heading)
+  // player arrow, rotated with heading
   const [px, py] = toMap(world.playerX, world.playerZ);
   g.save();
   g.translate(px, py);
-  g.rotate(Math.atan2(Math.sin(world.heading), Math.cos(world.heading)) * -1 + Math.PI);
+  g.rotate(Math.PI - world.heading);
   g.fillStyle = world.inCar ? '#e63946' : '#ffffff';
   g.beginPath();
   g.moveTo(0, -7);

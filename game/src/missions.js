@@ -1,8 +1,7 @@
-// Solmar missions — four jobs Rio runs for Madame Kestrel, the harbour fixer
-// he owes. Each mission has a light beacon at its target, a short brief and a
-// cash reward. Finish all four and Rio is out of debt.
-import { MISSIONS } from './config.js';
-import { PALETTE } from './config.js';
+// SOLMAR missions — four jobs Rio runs for Madame Kestrel, the harbour
+// fixer he owes. Each mission has a light beacon at its target, a short
+// brief and a cash reward. Finish all four and Rio is out of debt.
+import { MISSIONS, PALETTE } from './config.js';
 
 export function createMissions(scene) {
   const beaconMat = new THREE.MeshBasicMaterial({
@@ -63,8 +62,7 @@ export function updateMissions(m, dt, player, events = {}) {
   m.beacon.material.opacity = 0.24 + Math.sin(performance.now() / 280) * 0.08;
   const dx = player.x - m.active.target[0];
   const dz = player.z - m.active.target[1];
-  const d = Math.hypot(dx, dz);
-  if (d > m.active.radius) return null;
+  if (Math.hypot(dx, dz) > m.active.radius) return null;
   if (m.active.needCar && !player.inCar) {
     m.banner = 'Butuh mobil — curi satu dulu (E di dekat mobil).';
     m.bannerTimer = 2.5;
@@ -73,7 +71,8 @@ export function updateMissions(m, dt, player, events = {}) {
   const done = m.active;
   m.done.push(done.id);
   if (events.onComplete) events.onComplete(done);
-  return startMission(m, m.index + 1) === null ? done : done;
+  startMission(m, m.index + 1);
+  return done;
 }
 
 export function missionObjective(m) {

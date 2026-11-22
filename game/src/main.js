@@ -2,7 +2,7 @@
 // Wires every module: city, player, cars, traffic, police, missions, HUD,
 // audio, save and the deterministic screenshot mode. THREE comes from the
 // vendored UMD build (game/vendor/three.min.js) as a global.
-import { WORLD, PALETTE, PLAYER, CAR, START_CASH, BUST_FINE, MISSIONS } from './config.js';
+import { WORLD, PALETTE, PLAYER, CAR, START_CASH, BUST_FINE } from './config.js';
 import { makeRng } from './random.js';
 import { buildCity } from './city.js';
 import { createPlayer, updatePlayer, tryPunch } from './player.js';
@@ -45,7 +45,7 @@ const missions = createMissions(scene);
 const hud = createHud();
 const allCars = [...parked, ...traffic.cars];
 
-// player starts with his own red car parked near the spawn
+// Rio starts with his own red car parked near the spawn point.
 const homeCar = spawnCar(scene, rng, 6, 44, Math.PI, { color: PALETTE.carPlayer, owner: 'parked' });
 allCars.push(homeCar);
 
@@ -72,7 +72,7 @@ const game = {
   startMission: (i) => startMission(missions, i),
 };
 
-// --- input -------------------------------------------------------------------
+// --- input -----------------------------------------------------------------
 const keys = { w: false, a: false, s: false, d: false, shift: false, space: false };
 let camYaw = 0;
 let dragging = false;
@@ -148,10 +148,11 @@ function tryEnterExitCar() {
   audio.engineStart();
   if (stolen) {
     car.stolen = true;
-    addHeat(police, 1);
+    addHeat(police, WANTED_STEAL_HEAT);
     showToast(hud, 'Mobil dicuri! Polisi mengejar — ★ naik', 3);
   }
 }
+const WANTED_STEAL_HEAT = 1;
 
 // --- pause / busted ----------------------------------------------------------
 function togglePause() {
@@ -260,8 +261,32 @@ if (shot) {
   camYaw = game.camYaw;
   hud.menu.style.display = 'none';
   hud.help.style.display = 'none';
-  // keep the mission banner visible for the shot
-  showBanner(hud, `${missionObjective(missions)} — ${missionBrief(missions)}`, 30);
+  // Short banner flash only: the HUD top-right already carries the
+  // objective + brief, so a long banner would duplicate it in the frame.
+  showBanner(hud, missionObjective(missions), 2);
+}
+
+// --- punch targets -----------------------------------------------------------
+function punchTargets() {
+  const peds = traffic.peds.filter((p) => p.health > 0).map((p) => ({
+    x: p.x,
+    z: p.z,
+    health: p.health,
+    onHit: (dmg) => {
+      p.health -= dmg;
+      if (p.health <= 0) addHeat(police, 1);
+    },
+  }));
+  const cops = police.cops.filter((c) => c.health > 0).map((c) => ({
+    x: c.x,
+    z: c.z,
+    health: c.health,
+    onHit: (dmg) => {
+      c.health -= dmg;
+      addHeat(police, 1);
+    },
+  }));
+  return [...peds, ...cops];
 }
 
 // --- main loop ---------------------------------------------------------------
@@ -291,27 +316,7 @@ function animate() {
       const acted = updatePlayer(player, dt, keys, camYaw, city.colliders);
       if (acted === 'punched') {
         audio.punch();
-        const targets = [
-          ...traffic.peds.filter((p) => p.health > 0).map((p) => ({
-            x: p.x,
-            z: p.z,
-            health: p.health,
-            onHit: (dmg) => {
-              p.health -= dmg;
-              if (p.health <= 0) addHeat(police, 1);
-            },
-          })),
-          ...police.cops.filter((c) => c.health > 0).map((c) => ({
-            x: c.x,
-            z: c.z,
-            health: c.health,
-            onHit: (dmg) => {
-              c.health -= dmg;
-              addHeat(police, 1);
-            },
-          })),
-        ];
-        tryPunch(player, targets);
+        tryPunch(player, punchTargets());
       }
       audio.engine(0, false);
     }

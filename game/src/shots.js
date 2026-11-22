@@ -1,8 +1,11 @@
 // Deterministic screenshot mode: ?shot=chase|city|mission|police&seed=N
-// Stages one scene per shot (player spot, car, wanted level, active mission),
-// then lets the game run a few fixed frames so traffic and police settle.
-// main.js calls applyShot() once at boot and sets window.__shotReady when the
-// scene has rendered enough frames for a headless capture.
+// Stages one scene per shot (player spot, car, wanted level, active
+// mission), then lets the game run a few fixed frames so traffic and
+// police settle. main.js calls applyShot() once at boot and sets
+// window.__shotReady when the scene has rendered enough frames for a
+// headless capture.
+import { startMission } from './missions.js';
+
 export function parseShot() {
   const q = new URLSearchParams(location.search);
   const shot = q.get('shot');
@@ -10,10 +13,15 @@ export function parseShot() {
   return { name: shot, seed: Number(q.get('seed') || 1) };
 }
 
-// game: the object main.js builds {player, cars, police, missions, traffic, state, ...}
+function stage(game, index) {
+  game.missions.index = index;
+  game.startMission(index);
+}
+
+// game: the object main.js builds {player, cars, police, missions, state, ...}
 // Returns the camera preset for this shot: {dist, height, yawOffset}.
 export function applyShot(game, shot) {
-  const { player, police, missions, state } = game;
+  const { player, police, state } = game;
   state.shotMode = true;
   state.paused = false;
   state.started = true;
@@ -28,7 +36,7 @@ export function applyShot(game, shot) {
   };
 
   if (shot.name === 'chase') {
-    // cover: Rio fleeing in a red car, wanted 3, two patrol cars on his tail,
+    // cover: Rio fleeing in a red car, wanted 3, patrol cars closing in,
     // mission 2 (hotwire) active so the objective shows in the HUD.
     const car = game.cars.find((c) => c.owner === 'parked') || game.cars[0];
     car.x = 0;
@@ -38,36 +46,33 @@ export function applyShot(game, shot) {
     putPlayerInCar(car);
     game.camYaw = Math.PI;
     state.cash = 370;
-    missions.index = 1;
-    const m = missions.active;
-    startMissionAt(game, 1);
+    stage(game, 1);
     police.wanted = 3;
     police.unseen = 0;
-    // pull two patrol cars right behind the player
-    game.police.patrols.length = 0;
+    game.police.patrols.length = 0; // fresh patrols spawn behind the player
     return { dist: 13, height: 5.2, yawOffset: 0 };
   }
 
   if (shot.name === 'city') {
-    // on foot downtown, traffic and pedestrians around, morning light
+    // on foot downtown, traffic and pedestrians around, camera pulled back
     player.x = 23;
     player.z = 23;
     player.heading = Math.PI * 0.75;
     game.camYaw = Math.PI * 0.75;
     state.cash = 120;
-    startMissionAt(game, 0);
+    stage(game, 0);
     police.wanted = 0;
-    return { dist: 10, height: 4.4, yawOffset: 0 };
+    return { dist: 12, height: 5.4, yawOffset: 0 };
   }
 
   if (shot.name === 'mission') {
-    // standing at the harbour beacon with the mission dialog in the HUD
+    // standing at the harbour beacon with the mission brief in the HUD
     player.x = 12;
     player.z = -178;
     player.heading = Math.PI;
     game.camYaw = Math.PI;
     state.cash = 120;
-    startMissionAt(game, 0);
+    stage(game, 0);
     police.wanted = 0;
     return { dist: 11, height: 5, yawOffset: 0 };
   }
@@ -79,19 +84,13 @@ export function applyShot(game, shot) {
     player.heading = Math.PI / 2;
     game.camYaw = Math.PI / 2;
     state.cash = 620;
-    startMissionAt(game, 2);
+    stage(game, 2);
     police.wanted = 4;
     police.unseen = 0;
     return { dist: 15, height: 6, yawOffset: 0.5 };
   }
 
   // unknown shot name: fall back to a plain city view
-  startMissionAt(game, 0);
-  return { dist: 11, height: 5, yawOffset: 0 };
-}
-
-function startMissionAt(game, index) {
-  // missions.js exports startMission; re-exported here to keep main.js thin.
-  game.missions.index = index;
-  game.startMission(index);
+  stage(game, 0);
+  return { dist: 12, height: 5.4, yawOffset: 0 };
 }
