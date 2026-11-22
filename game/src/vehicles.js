@@ -1,6 +1,6 @@
-// Solmar cars — one low-poly car factory (body, cabin, wheels, lights) plus
-// arcade driving for the player's car. Parked cars can be stolen with E;
-// stealing is reported through onSteal so police.js can raise the wanted level.
+// SOLMAR cars — one low-poly car factory (body, cabin, wheels, lights)
+// plus arcade driving for the player's car. Parked cars can be stolen
+// with E; stealing is reported through onSteal so police can raise heat.
 import { CAR, PALETTE } from './config.js';
 import { hitsCollider, clampToWorld } from './city.js';
 
@@ -18,6 +18,7 @@ export function makeCarMesh(color, isPolice) {
   const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 2.1), glass);
   cabin.position.set(0, 1.1, -0.25);
   g.add(cabin);
+
   const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.28, 10);
   const wheels = [];
   for (const [wx, wz] of [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]]) {
@@ -33,6 +34,7 @@ export function makeCarMesh(color, isPolice) {
     lamp.position.set(lx, 0.62, 2.16);
     g.add(lamp);
   }
+
   let beacon = null;
   let beaconMat = null;
   if (isPolice) {
@@ -40,7 +42,10 @@ export function makeCarMesh(color, isPolice) {
     beacon = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.18, 0.5), beaconMat);
     beacon.position.set(0, 1.45, -0.25);
     g.add(beacon);
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.02, 0.18, 4.32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(2.02, 0.18, 4.32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    );
     stripe.position.y = 0.72;
     g.add(stripe);
   }
@@ -69,8 +74,8 @@ export function spawnCar(scene, rng, x, z, heading, opts = {}) {
   };
 }
 
-// Arcade driving: W/S accelerate/brake-reverse, A/D steer (stronger at speed).
-// Returns distance driven this frame (for the speedometer / engine sound).
+// Arcade driving: W/S accelerate / brake-reverse, A/D steer (stronger at
+// speed). Returns the speed change this frame (engine sound / HUD use).
 export function driveCar(car, dt, keys, colliders) {
   const prev = car.speed;
   if (keys.w) car.speed += CAR.accel * dt;

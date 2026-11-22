@@ -1,6 +1,6 @@
-// Solmar traffic — NPC cars looping the road grid and pedestrians strolling
-// the sidewalks. Cars brake for the car ahead; pedestrians scatter when the
-// player's car barrels past them at speed.
+// SOLMAR traffic — NPC cars looping the road grid and pedestrians
+// strolling the sidewalks. Cars brake for the car ahead; pedestrians
+// scatter when the player's car barrels past them at speed.
 import { TRAFFIC } from './config.js';
 import { spawnCar } from './vehicles.js';
 
@@ -14,7 +14,8 @@ function makePedestrian(scene, color) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), skin);
   head.position.y = 1.62;
   g.add(head);
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.62, 0.26), new THREE.MeshLambertMaterial({ color: 0x33363b }));
+  const legMat = new THREE.MeshLambertMaterial({ color: 0x33363b });
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.62, 0.26), legMat);
   leg.position.set(-0.16, 0.31, 0);
   g.add(leg);
   const leg2 = leg.clone();
@@ -69,24 +70,30 @@ export function createTraffic(scene, rng, roads) {
   return { cars, peds };
 }
 
+// How far ahead another car is on this car's own line (negative = behind).
+function aheadOf(car, other) {
+  const tr = car.traffic;
+  if (tr.vertical) return (other.z - car.z) * Math.cos(car.heading);
+  return (other.x - car.x) * Math.sin(car.heading);
+}
+
+function sideOf(car, other) {
+  const tr = car.traffic;
+  return tr.vertical ? Math.abs(other.x - car.x) : Math.abs(other.z - car.z);
+}
+
 export function updateTraffic(t, dt, playerCar, playerPos, onPedHit) {
   // NPC cars: cruise their road line, wrap at the city edge, brake for the
-  // car directly ahead on the same line.
+  // car directly ahead on the same line (or the player's car).
   for (const c of t.cars) {
     const tr = c.traffic;
     let want = tr.speed;
     for (const o of t.cars) {
       if (o === c || !o.traffic || o.traffic.line !== tr.line || o.traffic.vertical !== tr.vertical) continue;
-      const ahead = tr.vertical ? (o.z - c.z) * Math.cos(c.heading) : (o.x - c.x) * Math.sin(c.heading);
-      const side = tr.vertical ? Math.abs(o.x - c.x) : Math.abs(o.z - c.z);
-      if (ahead > 0 && ahead < 9 && side < 3) want = 0;
+      if (aheadOf(c, o) > 0 && aheadOf(c, o) < 9 && sideOf(c, o) < 3) want = 0;
     }
-    if (playerCar) {
-      const dx = playerCar.x - c.x;
-      const dz = playerCar.z - c.z;
-      const ahead = tr.vertical ? dz * Math.cos(c.heading) : dx * Math.sin(c.heading);
-      const side = tr.vertical ? Math.abs(dx) : Math.abs(dz);
-      if (ahead > 0 && ahead < 10 && side < 3.5) want = 0;
+    if (playerCar && aheadOf(c, playerCar) > 0 && aheadOf(c, playerCar) < 10 && sideOf(c, playerCar) < 3.5) {
+      want = 0;
     }
     const step = want * dt;
     if (tr.vertical) c.z += Math.cos(c.heading) * step;
@@ -100,8 +107,8 @@ export function updateTraffic(t, dt, playerCar, playerPos, onPedHit) {
     for (const w of c.wheels) w.rotation.x += spin;
   }
 
-  // Pedestrians: amble along the sidewalk; flee the player's car; a hard hit
-  // by a fast player car knocks one down and reports it (wanted heat).
+  // Pedestrians: amble along the sidewalk; flee the player's speeding car;
+  // a hard hit by a fast player car knocks one down and reports it (heat).
   for (const p of t.peds) {
     if (p.health <= 0) {
       p.mesh.rotation.x = -Math.PI / 2; // lying down
@@ -114,9 +121,7 @@ export function updateTraffic(t, dt, playerCar, playerPos, onPedHit) {
       if (d < 7) {
         fleeing = true;
         p.flee = 1.2;
-        const dx = p.x - playerCar.x;
-        const dz = p.z - playerCar.z;
-        p.heading = Math.atan2(dx, dz);
+        p.heading = Math.atan2(p.x - playerCar.x, p.z - playerCar.z);
       } else if (d < 3.5 && Math.abs(playerCar.speed) > 12) {
         p.health = 0;
         if (onPedHit) onPedHit(p);

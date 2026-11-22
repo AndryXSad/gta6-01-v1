@@ -1,8 +1,8 @@
-// Solmar police — wanted level 1–5, patrol cars plus foot officers.
+// SOLMAR police — wanted level 1–5, patrol cars plus foot officers.
 // Stars rise when the player steals a car, hits a pedestrian or punches a
-// cop; they fall when the player stays out of sight long enough. At 3+ stars
-// foot cops open fire; a patrol ram hurts. Touch a foot cop while wanted and
-// Rio gets busted.
+// cop; they fall when the player stays out of sight long enough. At 3+
+// stars foot cops open fire; a patrol ram hurts. Touch a foot cop while
+// wanted and Rio gets busted.
 import { WANTED, PALETTE } from './config.js';
 import { spawnCar } from './vehicles.js';
 
@@ -38,17 +38,22 @@ function spawnCop(pol, x, z) {
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.12, 10), navy);
   cap.position.y = 1.95;
   g.add(cap);
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.7, 0.3), navy);
-  leg.position.set(-0.19, 0.35, 0);
-  g.add(leg);
-  const leg2 = leg.clone();
-  leg2.position.x = 0.19;
-  g.add(leg2);
+  for (const lx of [-0.19, 0.19]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.7, 0.3), navy);
+    leg.position.set(lx, 0.35, 0);
+    g.add(leg);
+  }
   g.position.set(x, 0, z);
   pol.scene.add(g);
   const cop = { mesh: g, x, z, heading: 0, speed: 5.2, health: 100, onHit: null };
   pol.cops.push(cop);
   return cop;
+}
+
+// Spawn a unit on a ring around the player so it arrives from off-screen.
+function ringSpawn(pol, distance) {
+  const a = pol.rng.range(0, Math.PI * 2);
+  return [pol._px + Math.sin(a) * distance, pol._pz + Math.cos(a) * distance];
 }
 
 export function addHeat(pol, n) {
@@ -61,16 +66,24 @@ export function setWanted(pol, n) {
   pol.unseen = 0;
 }
 
+function wrapAngle(dh) {
+  while (dh > Math.PI) dh -= Math.PI * 2;
+  while (dh < -Math.PI) dh += Math.PI * 2;
+  return dh;
+}
+
 // dt step. player: {x, z, inCar, car, health}. events: {onBusted, onShot, onRam}
 export function updatePolice(pol, dt, player, events = {}) {
   const px = player.x;
   const pz = player.z;
+  pol._px = px;
+  pol._pz = pz;
 
-  // keep the right number of patrol cars for the wanted level
+  // keep the right number of patrol cars / foot cops for the wanted level
   const wantPatrols = WANTED.patrols[pol.wanted] || 0;
   while (pol.patrols.length < wantPatrols) {
-    const a = pol.rng.range(0, Math.PI * 2);
-    spawnPatrol(pol, px + Math.sin(a) * 55, pz + Math.cos(a) * 55);
+    const [x, z] = ringSpawn(pol, 55);
+    spawnPatrol(pol, x, z);
   }
   while (pol.patrols.length > wantPatrols) {
     const c = pol.patrols.pop();
@@ -78,8 +91,8 @@ export function updatePolice(pol, dt, player, events = {}) {
   }
   const wantCops = pol.wanted >= 2 ? 1 : 0;
   while (pol.cops.length < wantCops) {
-    const a = pol.rng.range(0, Math.PI * 2);
-    spawnCop(pol, px + Math.sin(a) * 30, pz + Math.cos(a) * 30);
+    const [x, z] = ringSpawn(pol, 30);
+    spawnCop(pol, x, z);
   }
   while (pol.cops.length > wantCops) {
     const c = pol.cops.pop();
@@ -94,9 +107,7 @@ export function updatePolice(pol, dt, player, events = {}) {
     const d = Math.hypot(dx, dz);
     nearest = Math.min(nearest, d);
     const target = Math.atan2(dx, dz);
-    let dh = target - c.heading;
-    while (dh > Math.PI) dh -= Math.PI * 2;
-    while (dh < -Math.PI) dh += Math.PI * 2;
+    const dh = wrapAngle(target - c.heading);
     c.heading += Math.max(-2.4 * dt, Math.min(2.4 * dt, dh));
     const speed = Math.min(30, 13 + pol.wanted * 3.2);
     c.x += Math.sin(c.heading) * speed * dt;

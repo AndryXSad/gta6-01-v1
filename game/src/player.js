@@ -1,40 +1,36 @@
-// Rio — the player on foot. Low-poly figure (torso, head, cap, legs), WASD
-// movement relative to the camera, Shift to run, Space/F to punch. Building
-// collision is resolved axis by axis so Rio slides along walls.
+// Rio — the player on foot. Low-poly figure (torso, head, cap, legs, arms),
+// WASD movement relative to the camera, Shift to run, Space to punch.
+// Building collision resolves axis by axis so Rio slides along walls
+// instead of sticking to them.
 import { PLAYER } from './config.js';
 import { hitsCollider, clampToWorld } from './city.js';
+
+function limb(mat, w, h, d, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  return m;
+}
 
 export function createPlayer(scene) {
   const group = new THREE.Group();
   const skin = new THREE.MeshLambertMaterial({ color: 0xe8b98a });
   const shirt = new THREE.MeshLambertMaterial({ color: 0x2a9d8f });
   const pants = new THREE.MeshLambertMaterial({ color: 0x264653 });
-  const cap = new THREE.MeshLambertMaterial({ color: 0xe63946 });
+  const capMat = new THREE.MeshLambertMaterial({ color: 0xe63946 });
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.85, 0.4), shirt);
-  torso.position.y = 1.05;
-  group.add(torso);
+  group.add(limb(shirt, 0.72, 0.85, 0.4, 0, 1.05, 0)); // torso
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), skin);
   head.position.y = 1.72;
   group.add(head);
-  const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.14, 10), cap);
+  const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.14, 10), capMat);
   hat.position.y = 1.95;
   group.add(hat);
-  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.3), cap);
-  brim.position.set(0, 1.9, 0.32);
-  group.add(brim);
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.7, 0.3), pants);
-  legL.position.set(-0.19, 0.35, 0);
-  group.add(legL);
-  const legR = legL.clone();
-  legR.position.x = 0.19;
-  group.add(legR);
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.24), shirt);
-  armL.position.set(-0.48, 1.05, 0);
-  group.add(armL);
-  const armR = armL.clone();
-  armR.position.x = 0.48;
-  group.add(armR);
+  group.add(limb(capMat, 0.5, 0.06, 0.3, 0, 1.9, 0.32)); // cap brim
+  const legL = limb(pants, 0.26, 0.7, 0.3, -0.19, 0.35, 0);
+  const legR = limb(pants, 0.26, 0.7, 0.3, 0.19, 0.35, 0);
+  const armL = limb(shirt, 0.2, 0.7, 0.24, -0.48, 1.05, 0);
+  const armR = limb(shirt, 0.2, 0.7, 0.24, 0.48, 1.05, 0);
+  group.add(legL, legR, armL, armR);
 
   scene.add(group);
   return {
@@ -54,7 +50,14 @@ export function createPlayer(scene) {
   };
 }
 
-// keys: {w,a,s,d,shift,space} — space triggers a punch.
+// Turn an angle difference into the [-PI, PI] range.
+function wrapAngle(dh) {
+  while (dh > Math.PI) dh -= Math.PI * 2;
+  while (dh < -Math.PI) dh += Math.PI * 2;
+  return dh;
+}
+
+// keys: {w,a,s,d,shift,space} — space triggers a punch swing.
 // camYaw: camera heading; movement is relative to it.
 // Returns 'punched' when a punch swing starts, else null.
 export function updatePlayer(p, dt, keys, camYaw, colliders) {
@@ -71,15 +74,13 @@ export function updatePlayer(p, dt, keys, camYaw, colliders) {
     const len = Math.hypot(mx, mz);
     mx /= len;
     mz /= len;
-    // camera-relative: forward is the camera yaw direction
+    // camera-relative: forward follows the camera yaw
     const sin = Math.sin(camYaw);
     const cos = Math.cos(camYaw);
     const wx = mx * cos - mz * sin;
     const wz = mx * sin + mz * cos;
     const targetHeading = Math.atan2(wx, wz);
-    let dh = targetHeading - p.heading;
-    while (dh > Math.PI) dh -= Math.PI * 2;
-    while (dh < -Math.PI) dh += Math.PI * 2;
+    const dh = wrapAngle(targetHeading - p.heading);
     p.heading += Math.max(-PLAYER.turnSpeed * dt, Math.min(PLAYER.turnSpeed * dt, dh));
     p.speed = run;
     const nx = p.x + Math.sin(p.heading) * run * dt;
@@ -121,7 +122,8 @@ export function tryPunch(p, targets) {
     const dz = t.z - p.z;
     const d = Math.hypot(dx, dz);
     if (d > PLAYER.punchRange) continue;
-    if (d > 0.01 && (dx * fx + dz * fz) / d < 0.35) continue; // must be roughly ahead
+    // must be roughly ahead of Rio
+    if (d > 0.01 && (dx * fx + dz * fz) / d < 0.35) continue;
     if (d < bestD) {
       best = t;
       bestD = d;
