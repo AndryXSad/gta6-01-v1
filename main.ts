@@ -1,26 +1,23 @@
-// SOLMAR — entri open-world crime untuk gta6-01 (Node 22, standard library only).
-// Game-nya file statis di game/ (index.html + modul ES + three.js yang di-vendor,
-// tanpa network). Program ini menyalin game/ dan screenshots/ dari samping file
-// ini ke /output lalu menulis /output/dossier.json — ringkasan yang dibaca juri —
-// dengan library make.fun yang di-vendor. Di luar container grader,
-// MAKEFUN_OUTPUT_DIR menggantikan /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-// Mainkan lokal dengan `node serve.ts`, lalu buka http://localhost:8080.
+// SOLMAR — a gta6-01 entry (Node 22, standard library only).
 //
-// Ditulis ulang untuk rebuild terekam 21 Nov 2026: isi fungsional sama dengan
-// starter (salin + dossier), penamaan & komentar ditulis sendiri di sesi ini.
+// The game itself is plain static files in game/: index.html plus ES modules
+// plus a vendored three.js build, loaded offline with no network at all. This
+// program is only the hand-in plumbing: it copies game/ and screenshots/ from
+// beside this file into the output directory and writes dossier.json there,
+// the summary the judge reads, using the vendored make.fun library.
+//
+// Local run (MAKEFUN_OUTPUT_DIR stands in for /output outside the grader):
+//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+// Play it locally first with `node serve.ts`, then http://localhost:8080.
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-// Direktori repo ini (tempat main.ts berada) dan direktori output grader.
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-// Game + screenshot disalin apa adanya; dossier dibangun dari hasil salinan
-// supaya isinya persis sama dengan yang dinilai.
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
 mkdirSync(join(out, 'screenshots'), { recursive: true });
@@ -28,9 +25,12 @@ if (existsSync(join(here, 'screenshots'))) {
   cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 }
 
-// Batas gate (lihat kit RULES.txt): teks dossier max 160 KiB, max 4 screenshot
-// @ 256 KiB, game/ max 993 entri & 48 MiB, path max 1000 byte. Angka-angka ini
-// disalin dari kit segar level 32 (competition.yaml) saat rebuild 21 Nov 2026.
+// Caps from the scorer's own gates (reference/gate.json): text_max_bytes is
+// the only one that shapes bytes; the rest refuse an entry the scorer would
+// refuse anyway — more than 4 screenshots or one over 256 KiB, more than 993
+// files in game/ or 48 MiB of game files in all, or a path under game/ over
+// 1000 bytes. (game/ counts beside /output's own 1000-entry cap, its
+// screenshots/ folder and dossier.json.)
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {
