@@ -1,33 +1,39 @@
-// Save: one small JSON blob in localStorage — cash, which mission the
-// player is on, and how many jobs are done. Nothing else leaves the game.
-
-const KEY = 'solmar-save-v1';
+// Save and load: cash, mission progress and best run, kept in localStorage.
+// Storage can be off (private windows); then progress lasts the visit only.
+import { SAVE_KEY } from './config.js';
 
 export function loadSave() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (typeof data.money !== 'number' || typeof data.missionIndex !== 'number') return null;
-    return data;
+    if (typeof data !== 'object' || data === null) return null;
+    return {
+      money: Number.isFinite(data.money) ? data.money : 0,
+      mission: Number.isFinite(data.mission) ? data.mission : 0,
+      best: Number.isFinite(data.best) ? data.best : 0,
+    };
   } catch {
     return null;
   }
 }
 
-export function writeSave(data) {
+export function storeSave(data) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({
-      money: Math.floor(data.money),
-      missionIndex: data.missionIndex,
-      savedAt: new Date().toISOString(),
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({
+      money: data.money || 0,
+      mission: data.mission || 0,
+      best: data.best || 0,
     }));
-    return true;
   } catch {
-    return false;
+    // Storage off: ignore.
   }
 }
 
 export function clearSave() {
-  try { localStorage.removeItem(KEY); } catch { /* private mode — ignore */ }
+  try {
+    window.localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // Ignore.
+  }
 }
