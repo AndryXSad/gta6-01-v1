@@ -31,7 +31,7 @@ every building, palm and street lamp is generated in code.
   getaway. A light beacon marks each target; finishing a mission pays cash.
 - **Living traffic** — NPC cars cruise the grid and brake for the car ahead;
   pedestrians stroll the sidewalks and scatter when you speed past.
-- **Combat** — punch with Space (or F). Punching a cop is a bad idea.
+- **Combat** — punch with Space. Punching a cop is a bad idea.
 - **HUD + minimap** — health, cash, wanted stars, city clock, mission
   objective and a live top-down minimap with the mission marker.
 - **Save** — progress (mission, cash, health, wanted, position) autosaves to
