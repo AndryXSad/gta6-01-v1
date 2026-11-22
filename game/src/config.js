@@ -62,7 +62,7 @@ export const CAR = {
 
 export const TRAFFIC = {
   carCount: 14,
-  pedCount: 22,
+  pedCount: 24, // a couple more walkers so downtown feels alive in shots
   carSpeed: 9,
   pedSpeed: 2.2,
 };

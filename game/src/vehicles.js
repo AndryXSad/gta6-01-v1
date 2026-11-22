@@ -4,7 +4,7 @@
 import { CAR, PALETTE } from './config.js';
 import { hitsCollider, clampToWorld } from './city.js';
 
-const CAR_COLORS = [0xe63946, 0x457b9d, 0xf4d35e, 0x8d99ae, 0x2a9d8f, 0xe0a458, 0x6d6875, 0xf1faee];
+const CAR_COLORS = [0xe63946, 0x457b9d, 0xf4d35e, 0x8d99ae, 0x2a9d8f, 0xe0a458, 0x6d6875, 0xf1faee, 0x3a6b4f];
 
 export function makeCarMesh(color, isPolice) {
   const g = new THREE.Group();

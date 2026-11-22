@@ -62,6 +62,7 @@ node serve.ts
 Deterministic shots (`?shot=...&seed=1`): `1-chase` (cover: getaway with
 wanted stars, minimap and objective), `2-city` (downtown on foot),
 `3-mission` (harbour beacon + mission dialog), `4-police` (wanted 4 standoff).
+Retake them with the headless shell in `shots.json` after any visual change.
 
 ## Source layout
 

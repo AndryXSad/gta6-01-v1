@@ -59,7 +59,7 @@ export function updateMissions(m, dt, player, events = {}) {
   if (m.bannerTimer > 0) m.bannerTimer -= dt;
   if (!m.active) return null;
   m.beacon.rotation.y += dt * 0.8;
-  m.beacon.material.opacity = 0.24 + Math.sin(performance.now() / 280) * 0.08;
+  m.beacon.material.opacity = 0.26 + Math.sin(performance.now() / 280) * 0.08;
   const dx = player.x - m.active.target[0];
   const dz = player.z - m.active.target[1];
   if (Math.hypot(dx, dz) > m.active.radius) return null;

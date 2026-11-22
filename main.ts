@@ -10,6 +10,7 @@
 // Local run (MAKEFUN_OUTPUT_DIR stands in for /output outside the grader):
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 // Play it locally first with `node serve.ts`, then http://localhost:8080.
+// The dossier is the judge's summary: game files + screenshots + outline.
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

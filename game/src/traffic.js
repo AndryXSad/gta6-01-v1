@@ -118,7 +118,7 @@ export function updateTraffic(t, dt, playerCar, playerPos, onPedHit) {
     let fleeing = false;
     if (playerCar && Math.abs(playerCar.speed) > 8) {
       const d = Math.hypot(p.x - playerCar.x, p.z - playerCar.z);
-      if (d < 7) {
+      if (d < 8) {
         fleeing = true;
         p.flee = 1.2;
         p.heading = Math.atan2(p.x - playerCar.x, p.z - playerCar.z);

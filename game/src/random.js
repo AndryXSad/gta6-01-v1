@@ -43,6 +43,10 @@ export function makeRng(seed) {
     chance(p) {
       return next() < p;
     },
+    // Alias that reads better at call sites: rng.yes(0.3)
+    yes(p) {
+      return next() < p;
+    },
     sign() {
       return next() < 0.5 ? -1 : 1;
     },

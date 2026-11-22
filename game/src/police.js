@@ -82,7 +82,7 @@ export function updatePolice(pol, dt, player, events = {}) {
   // keep the right number of patrol cars / foot cops for the wanted level
   const wantPatrols = WANTED.patrols[pol.wanted] || 0;
   while (pol.patrols.length < wantPatrols) {
-    const [x, z] = ringSpawn(pol, 55);
+    const [x, z] = ringSpawn(pol, 50);
     spawnPatrol(pol, x, z);
   }
   while (pol.patrols.length > wantPatrols) {

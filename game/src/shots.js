@@ -4,8 +4,6 @@
 // police settle. main.js calls applyShot() once at boot and sets
 // window.__shotReady when the scene has rendered enough frames for a
 // headless capture.
-import { startMission } from './missions.js';
-
 export function parseShot() {
   const q = new URLSearchParams(location.search);
   const shot = q.get('shot');

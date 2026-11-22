@@ -125,16 +125,16 @@ export function drawMinimap(hud, world) {
     g.arc(px, py, 3, 0, Math.PI * 2);
     g.fill();
   }
-  // player arrow, rotated with heading
+  // player arrow, rotated with heading (slightly larger so it reads at a glance)
   const [px, py] = toMap(world.playerX, world.playerZ);
   g.save();
   g.translate(px, py);
   g.rotate(Math.PI - world.heading);
   g.fillStyle = world.inCar ? '#e63946' : '#ffffff';
   g.beginPath();
-  g.moveTo(0, -7);
-  g.lineTo(5, 6);
-  g.lineTo(-5, 6);
+  g.moveTo(0, -8);
+  g.lineTo(5.5, 6.5);
+  g.lineTo(-5.5, 6.5);
   g.closePath();
   g.fill();
   g.restore();

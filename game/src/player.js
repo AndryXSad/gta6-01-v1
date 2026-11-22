@@ -91,7 +91,7 @@ export function updatePlayer(p, dt, keys, camYaw, colliders) {
     const [cx, cz] = clampToWorld(p.x, p.z);
     p.x = cx;
     p.z = cz;
-    p.walkPhase += dt * run * 1.6;
+    p.walkPhase += dt * run * 1.7; // leg swing speed scales with pace
   } else {
     p.speed = 0;
   }

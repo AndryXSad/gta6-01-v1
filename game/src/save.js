@@ -4,6 +4,7 @@
 import { SAVE_KEY, START_CASH, PLAYER } from './config.js';
 
 export function defaultSave() {
+  // version 1: bump SAVE_KEY in config.js if this shape ever changes.
   return {
     version: 1,
     missionIndex: 0,

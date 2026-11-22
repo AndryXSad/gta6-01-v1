@@ -2,7 +2,7 @@
 // Wires every module: city, player, cars, traffic, police, missions, HUD,
 // audio, save and the deterministic screenshot mode. THREE comes from the
 // vendored UMD build (game/vendor/three.min.js) as a global.
-import { WORLD, PALETTE, PLAYER, CAR, START_CASH, BUST_FINE } from './config.js';
+import { WORLD, PALETTE, PLAYER, CAR, WANTED, START_CASH, BUST_FINE } from './config.js';
 import { makeRng } from './random.js';
 import { buildCity } from './city.js';
 import { createPlayer, updatePlayer, tryPunch } from './player.js';
@@ -148,11 +148,10 @@ function tryEnterExitCar() {
   audio.engineStart();
   if (stolen) {
     car.stolen = true;
-    addHeat(police, WANTED_STEAL_HEAT);
+    addHeat(police, WANTED.stealHeat);
     showToast(hud, 'Mobil dicuri! Polisi mengejar — ★ naik', 3);
   }
 }
-const WANTED_STEAL_HEAT = 1;
 
 // --- pause / busted ----------------------------------------------------------
 function togglePause() {

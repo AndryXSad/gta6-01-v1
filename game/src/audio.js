@@ -15,7 +15,7 @@ function ensure() {
     if (!AC) return false;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.22;
+    master.gain.value = 0.2;
     master.connect(ctx.destination);
     return true;
   } catch (e) {

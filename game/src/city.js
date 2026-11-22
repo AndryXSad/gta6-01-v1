@@ -85,7 +85,7 @@ export function buildCity(scene, rng) {
     flat(WORLD.roadWidth, cityMax - cityMin + WORLD.roadWidth, roadMat, x, 0.04, 0);
     for (let z = cityMin; z <= cityMax; z += 12) {
       if (onRoad(z)) continue; // keep intersections clean
-      flat(0.4, 3.2, lineMat, x, 0.06, z);
+      flat(0.4, 3.0, lineMat, x, 0.06, z);
     }
   }
   for (let z = cityMin; z <= cityMax; z += WORLD.roadGap) {
