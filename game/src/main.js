@@ -250,7 +250,8 @@ function updateCamera(dt, snap) {
   const dist = player.inCar ? 13.5 : 8.5;
   const height = player.inCar ? 6.4 : 5;
   // Ease the orbit yaw behind a driven car; on foot it stays where dragged.
-  if (player.inCar) {
+  // A snap (screenshot staging) keeps the staged yaw exactly.
+  if (player.inCar && !snap) {
     let diff = player.heading - G.cameraYaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
