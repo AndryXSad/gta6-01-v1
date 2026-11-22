@@ -396,6 +396,7 @@ function animate() {
   }
 }
 
-startMission(missions, 0);
+// In shot mode applyShot already staged the mission — don't reset it to 0.
+if (!shot) startMission(missions, 0);
 animate();
 window.__solmar = { game, state, player, police, missions };

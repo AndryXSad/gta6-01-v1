@@ -36,8 +36,9 @@ export function applyShot(game, shot) {
   if (shot.name === 'chase') {
     // cover: Rio fleeing in a red car, wanted 3, patrol cars closing in,
     // mission 2 (hotwire) active so the objective shows in the HUD.
+    // Staged ON the x=-23 road (x=0 is a building block line, not a road).
     const car = game.cars.find((c) => c.owner === 'parked') || game.cars[0];
-    car.x = 0;
+    car.x = -23;
     car.z = -40;
     car.heading = Math.PI;
     car.speed = 22;
@@ -76,16 +77,17 @@ export function applyShot(game, shot) {
   }
 
   if (shot.name === 'police') {
-    // wanted 4: patrol cars closing in from two sides, Rio on foot
-    player.x = -46;
-    player.z = 0;
+    // wanted 4: patrol cars closing in from two sides, Rio on foot.
+    // Staged at the (-23, -23) road crossing so no building blocks the lens.
+    player.x = -23;
+    player.z = -23;
     player.heading = Math.PI / 2;
     game.camYaw = Math.PI / 2;
     state.cash = 620;
     stage(game, 2);
     police.wanted = 4;
     police.unseen = 0;
-    return { dist: 15, height: 6, yawOffset: 0.5 };
+    return { dist: 15, height: 6, yawOffset: 0 };
   }
 
   // unknown shot name: fall back to a plain city view
