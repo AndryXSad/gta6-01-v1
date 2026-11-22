@@ -1,133 +1,139 @@
-// Traffic Solmar: mobil NPC mengikuti loop jalan grid + pejalan kaki di
-// trotoar. Pejalan kaki kabur bila mobil pemain melaju kencang di dekatnya;
-// mobil traffic mengerem bila ada mobil di depannya.
-import { CFG } from './config.js';
-import { pick, range, pickInt } from './random.js';
-import { buildCarMesh, CAR_COLORS } from './vehicles.js';
-
-const T = () => window.THREE;
+// Solmar traffic — NPC cars looping the road grid and pedestrians strolling
+// the sidewalks. Cars brake for the car ahead; pedestrians scatter when the
+// player's car barrels past them at speed.
+import { TRAFFIC } from './config.js';
+import { spawnCar } from './vehicles.js';
 
 function makePedestrian(scene, color) {
-  const THREE = T();
   const g = new THREE.Group();
   const shirt = new THREE.MeshLambertMaterial({ color });
-  const skin = new THREE.MeshLambertMaterial({ color: 0xe0ac69 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.3, 0.5), shirt);
-  body.position.y = 1.25;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 10, 8), skin);
-  head.position.y = 2.2;
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.9, 0.34), new THREE.MeshLambertMaterial({ color: 0x333333 }));
-  legL.position.set(-0.22, 0.45, 0);
-  const legR = legL.clone(); legR.position.x = 0.22;
-  g.add(body, head, legL, legR);
+  const skin = new THREE.MeshLambertMaterial({ color: 0xe8b98a });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.36), shirt);
+  body.position.y = 1.0;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 8, 6), skin);
+  head.position.y = 1.62;
+  g.add(head);
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.62, 0.26), new THREE.MeshLambertMaterial({ color: 0x33363b }));
+  leg.position.set(-0.16, 0.31, 0);
+  g.add(leg);
+  const leg2 = leg.clone();
+  leg2.position.x = 0.16;
+  g.add(leg2);
   scene.add(g);
-  return { group: g, legL, legR };
+  return g;
 }
 
-export function createTraffic(scene, city, rng) {
-  const THREE = T();
-  const gridRoads = city.roads.filter((r) => !r.highway);
+export function createTraffic(scene, rng, roads) {
   const cars = [];
-  for (let i = 0; i < 9; i++) {
-    const road = pick(rng, gridRoads);
-    const along = range(rng, -200, 200);
-    const color = pick(rng, CAR_COLORS);
-    const group = buildCarMesh(color);
-    const pos = road.axis === 'z'
-      ? { x: road.at - 3.2, z: along, heading: Math.PI }
-      : { x: along, z: road.at - 3.2, heading: -Math.PI / 2 };
-    group.position.set(pos.x, 0, pos.z);
-    group.rotation.y = pos.heading;
-    scene.add(group);
-    cars.push({
-      group, road, pos: group.position, heading: pos.heading,
-      speed: range(rng, 7, 12), baseSpeed: 0, color, dead: false,
-    });
-    cars[cars.length - 1].baseSpeed = cars[cars.length - 1].speed;
+  for (let i = 0; i < TRAFFIC.carCount; i++) {
+    const vertical = rng.chance(0.5);
+    const line = vertical ? rng.pick(roads.roadsV) : rng.pick(roads.roadsH);
+    const lane = rng.sign() * 2.6;
+    const along = rng.range(-200, 200);
+    const heading = vertical ? (lane > 0 ? 0 : Math.PI) : lane > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const car = spawnCar(
+      scene,
+      rng,
+      vertical ? line + lane : along,
+      vertical ? along : line + lane,
+      heading,
+      { owner: 'traffic', color: rng.chance(0.14) ? 0xf4d35e : undefined },
+    );
+    car.traffic = { vertical, line, lane, speed: TRAFFIC.carSpeed * rng.range(0.8, 1.25) };
+    cars.push(car);
   }
 
-  const pedColors = [0x1abc9c, 0xe67e22, 0x8e44ad, 0x16a085, 0xc0392b, 0x2c3e50];
   const peds = [];
-  for (let i = 0; i < 14; i++) {
-    const road = pick(rng, gridRoads);
-    const along = range(rng, -220, 220);
-    const side = rng() < 0.5 ? -8.5 : 8.5;
-    const mesh = makePedestrian(scene, pick(rng, pedColors));
-    const pos = road.axis === 'z'
-      ? { x: road.at + side, z: along }
-      : { x: along, z: road.at + side };
-    mesh.group.position.set(pos.x, 0, pos.z);
+  const pedColors = [0xc1666b, 0x457b9d, 0x7fb069, 0xe0a458, 0x8d99ae, 0xf1faee];
+  for (let i = 0; i < TRAFFIC.pedCount; i++) {
+    const mesh = makePedestrian(scene, rng.pick(pedColors));
+    const vertical = rng.chance(0.5);
+    const line = vertical ? rng.pick(roads.roadsV) : rng.pick(roads.roadsH);
+    const side = rng.sign() * 7.4;
     peds.push({
-      ...mesh, pos: mesh.group.position, heading: range(rng, 0, Math.PI * 2),
-      speed: range(rng, 1.2, 2.2), flee: 0, phase: range(rng, 0, 6),
-      road, side, dead: false, scared: false,
+      mesh,
+      x: vertical ? line + side : rng.range(-200, 200),
+      z: vertical ? rng.range(-200, 200) : line + side,
+      heading: rng.range(0, Math.PI * 2),
+      speed: TRAFFIC.pedSpeed * rng.range(0.7, 1.3),
+      health: 100,
+      vertical,
+      line,
+      side,
+      flee: 0,
+      walkPhase: rng.range(0, 6),
+      onHit: null,
     });
   }
+  return { cars, peds };
+}
 
-  return {
-    cars, peds,
+export function updateTraffic(t, dt, playerCar, playerPos, onPedHit) {
+  // NPC cars: cruise their road line, wrap at the city edge, brake for the
+  // car directly ahead on the same line.
+  for (const c of t.cars) {
+    const tr = c.traffic;
+    let want = tr.speed;
+    for (const o of t.cars) {
+      if (o === c || !o.traffic || o.traffic.line !== tr.line || o.traffic.vertical !== tr.vertical) continue;
+      const ahead = tr.vertical ? (o.z - c.z) * Math.cos(c.heading) : (o.x - c.x) * Math.sin(c.heading);
+      const side = tr.vertical ? Math.abs(o.x - c.x) : Math.abs(o.z - c.z);
+      if (ahead > 0 && ahead < 9 && side < 3) want = 0;
+    }
+    if (playerCar) {
+      const dx = playerCar.x - c.x;
+      const dz = playerCar.z - c.z;
+      const ahead = tr.vertical ? dz * Math.cos(c.heading) : dx * Math.sin(c.heading);
+      const side = tr.vertical ? Math.abs(dx) : Math.abs(dz);
+      if (ahead > 0 && ahead < 10 && side < 3.5) want = 0;
+    }
+    const step = want * dt;
+    if (tr.vertical) c.z += Math.cos(c.heading) * step;
+    else c.x += Math.sin(c.heading) * step;
+    if (c.z > 215) c.z = -215;
+    if (c.z < -215) c.z = 215;
+    if (c.x > 215) c.x = -215;
+    if (c.x < -215) c.x = 215;
+    c.mesh.position.set(c.x, 0, c.z);
+    const spin = (want * dt) / 0.36;
+    for (const w of c.wheels) w.rotation.x += spin;
+  }
 
-    update(dt, player, playerCar) {
-      // Mobil traffic: maju di jalurnya, putar balik di ujung kota.
-      for (const c of cars) {
-        let target = c.baseSpeed;
-        // Erem bila mobil pemain / traffic lain tepat di depan.
-        const fx = -Math.sin(c.heading), fz = -Math.cos(c.heading);
-        const ahead = [playerCar, ...cars].filter(Boolean);
-        for (const o of ahead) {
-          if (o === c) continue;
-          const dx = o.pos.x - c.pos.x, dz = o.pos.z - c.pos.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 9 && dist > 0.1 && (dx * fx + dz * fz) / dist > 0.7) { target = 0; break; }
-        }
-        c.speed += (target - c.speed) * Math.min(1, dt * 3);
-        c.pos.x += -Math.sin(c.heading) * c.speed * dt;
-        c.pos.z += -Math.cos(c.heading) * c.speed * dt;
-        if (c.pos.x < -CFG.worldHalf + 8 || c.pos.x > CFG.worldHalf - 8 ||
-            c.pos.z < -CFG.worldHalf + 8 || c.pos.z > CFG.worldHalf - 8) {
-          c.heading += Math.PI; // putar balik
-          c.group.rotation.y = c.heading;
-        }
+  // Pedestrians: amble along the sidewalk; flee the player's car; a hard hit
+  // by a fast player car knocks one down and reports it (wanted heat).
+  for (const p of t.peds) {
+    if (p.health <= 0) {
+      p.mesh.rotation.x = -Math.PI / 2; // lying down
+      p.mesh.position.y = 0.3;
+      continue;
+    }
+    let fleeing = false;
+    if (playerCar && Math.abs(playerCar.speed) > 8) {
+      const d = Math.hypot(p.x - playerCar.x, p.z - playerCar.z);
+      if (d < 7) {
+        fleeing = true;
+        p.flee = 1.2;
+        const dx = p.x - playerCar.x;
+        const dz = p.z - playerCar.z;
+        p.heading = Math.atan2(dx, dz);
+      } else if (d < 3.5 && Math.abs(playerCar.speed) > 12) {
+        p.health = 0;
+        if (onPedHit) onPedHit(p);
       }
-      // Pejalan kaki: jalan di trotoar, kabur dari mobil kencang.
-      for (const p of peds) {
-        p.flee = Math.max(0, p.flee - dt);
-        let sp = p.speed;
-        if (playerCar && !player.onFoot) {
-          const d = Math.hypot(playerCar.pos.x - p.pos.x, playerCar.pos.z - p.pos.z);
-          if (d < 14 && Math.abs(playerCar.speed) > 12) {
-            p.flee = 1.6;
-            p.scared = true;
-          }
-        }
-        if (p.flee > 0) {
-          sp = 5.5;
-          // Lari menjauhi jalan (ke arah trotoar luar).
-          const away = p.road.axis === 'z'
-            ? Math.sign(p.pos.x - p.road.at) : 0;
-          const awayZ = p.road.axis === 'x'
-            ? Math.sign(p.pos.z - p.road.at) : 0;
-          p.pos.x += away * sp * dt;
-          p.pos.z += awayZ * sp * dt;
-        } else {
-          // Jalan lurus di trotoar, berbalik di ujung.
-          const dirX = p.road.axis === 'z' ? 0 : Math.cos(p.heading);
-          const dirZ = p.road.axis === 'z' ? Math.sin(p.heading) : 0;
-          p.pos.x += dirX * sp * dt;
-          p.pos.z += dirZ * sp * dt;
-          if (Math.abs(p.pos.x) > CFG.worldHalf - 10 || Math.abs(p.pos.z) > CFG.worldHalf - 10) {
-            p.heading += Math.PI;
-          }
-        }
-        p.phase += dt * sp * 2.4;
-        p.legL.rotation.x = Math.sin(p.phase) * 0.6;
-        p.legR.rotation.x = -Math.sin(p.phase) * 0.6;
-        p.group.position.copy(p.pos);
-        // Pejalan kaki menghadap arah jalannya (trotoar sejajar jalan).
-        p.group.rotation.y = p.road.axis === 'z'
-          ? (Math.sin(p.heading) >= 0 ? 0 : Math.PI)
-          : (Math.cos(p.heading) >= 0 ? -Math.PI / 2 : Math.PI / 2);
-      }
-    },
-  };
+    }
+    if (p.flee > 0) p.flee -= dt;
+    const speed = fleeing ? p.speed * 2.4 : p.speed;
+    p.x += Math.sin(p.heading) * speed * dt;
+    p.z += Math.cos(p.heading) * speed * dt;
+    // wander: at intersections, sometimes turn onto the crossing road
+    if (Math.abs(p.x) % 46 < 1.2 || Math.abs(p.z) % 46 < 1.2) {
+      if (Math.random() < dt * 0.25) p.heading += (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;
+    }
+    if (p.x > 215 || p.x < -215 || p.z > 215 || p.z < -215) p.heading += Math.PI;
+    p.walkPhase += dt * speed * 2.2;
+    p.mesh.position.set(p.x, 0, p.z);
+    p.mesh.rotation.y = p.heading;
+    p.mesh.rotation.z = Math.sin(p.walkPhase) * 0.06;
+  }
 }
