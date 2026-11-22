@@ -37,7 +37,8 @@ export function applyShot(game, shot) {
     // cover: Rio fleeing in a red car, wanted 3, patrol cars closing in,
     // mission 2 (hotwire) active so the objective shows in the HUD.
     // Staged ON the x=-23 road (x=0 is a building block line, not a road).
-    const car = game.cars.find((c) => c.owner === 'parked') || game.cars[0];
+    // Use the last car in the list: Rio's own red car parked near spawn.
+    const car = game.cars[game.cars.length - 1];
     car.x = -23;
     car.z = -40;
     car.heading = Math.PI;
