@@ -470,7 +470,6 @@ function updateCamera(dt) {
     camera.lookAt(0, 8, 0);
     return;
   }
-  const target = playerCar ? playerCar.pos : player.pos;
   let wantYaw = camYaw;
   let wantPitch = camPitch;
   let wantDist = camDist;
