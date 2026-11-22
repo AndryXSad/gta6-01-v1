@@ -1,86 +1,55 @@
-# SOLMAR — Open-World Crime
+# SOLMAR — Make GTA 6 (gta6-01)
 
-[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![rank](https://make.fun/badge/gta6-01/AndryXSad/gta6-01-v1/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![reward](https://make.fun/badge/gta6-01/AndryXSad/gta6-01-v1/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![make.fun — gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01)
+[![rank](https://make.fun/badge/gta6-01/AndryXSad/gta6-01-v1/rank.svg)](https://make.fun/bounty/gta6-01)
+[![reward](https://make.fun/badge/gta6-01/AndryXSad/gta6-01-v1/reward.svg)](https://make.fun/bounty/gta6-01)
 
-**Solmar** is a sun-soaked coastal open-world crime game, built for the
-[make.fun gta6-01 bounty](https://make.fun/bounty/gta6-01). You are **Rio**, a
-harbour courier who owes money to the local fixer **Madame Kestrel**. Work off
-the debt across four story missions — while the Solmar police count your
-wanted stars.
+**Solmar** is an original open-world crime game for the desktop browser,
+built for the [gta6-01 bounty](https://make.fun/bounty/gta6-01) on make.fun.
+No Rockstar names, logos, characters, maps or assets are used anywhere —
+the city, the people and the story are all invented here.
 
-## The city
+## The game
 
-Solmar is a fully procedural 3D city: a downtown road grid with low-poly
-towers, a working harbour (cranes, containers, docks), a beach boulevard with
-palms, and a ring highway around it all. No external assets, no network —
-every building, palm and street lamp is generated in code.
+You are **Rio**, a harbour courier in debt to a local fixer, **Madame
+Kestrel**. Work off the debt across four story missions: deliver a package
+to the docks, steal a car and shake the police, pick up a friend on the
+boulevard mid-chase, then make the final getaway down the ring highway.
 
-## What you can do
+What is in the world:
 
-- **Walk and drive** — WASD on foot (Shift to run), E to get in and out of
-  any car, arcade driving with handbrake-style turns.
-- **Steal cars** — grab any parked or traffic car with E. Stealing raises your
-  wanted level, and the police notice.
-- **Wanted system (1–5 stars)** — patrol cars chase and ram you; foot cops
-  chase you down, and shoot at 3+ stars. Stay out of sight to cool off, or get
-  busted and wake up at the hospital minus a fine.
-- **Four story missions** — deliver a package to the harbour, steal a car for
-  the north garage, pick up Dara on the boulevard, then a final highway
-  getaway. A light beacon marks each target; finishing a mission pays cash.
-- **Living traffic** — NPC cars cruise the grid and brake for the car ahead;
-  pedestrians stroll the sidewalks and scatter when you speed past.
-- **Combat** — punch with Space. Punching a cop is a bad idea.
-- **HUD + minimap** — health, cash, wanted stars, city clock, mission
-  objective and a live top-down minimap with the mission marker.
-- **Save** — progress (mission, cash, health, wanted, position) autosaves to
-  localStorage; Continue from the start screen.
-- **Sound** — engine hum, sirens, punches, gunshots and mission jingles, all
-  synthesised with WebAudio. No audio files.
+- A drivable coastal city — downtown grid, harbour, beach boulevard,
+  ring highway and housing blocks, all procedural low-poly 3D (three.js).
+- On foot and by car: walk, run, punch, steal parked and NPC cars, drive
+  with handbrake.
+- Living traffic and pedestrians who walk the pavements and flee trouble.
+- A wanted level (1–5 stars): patrol cars and foot officers chase, ram
+  and, at 3 stars and up, shoot. Lay low and the heat cools off.
+- Four story missions with objective markers, dialogue and cash rewards.
+- HUD with health, cash, wanted stars, a live minimap, speed and the
+  city clock; a start screen and a localStorage save (Continue / New Game).
+- Synthesised WebAudio sound — engine, sirens, pickups, gunfire. No
+  external files, no network at all.
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| WASD / arrows | Walk / drive |
-| Shift | Run |
-| E | Enter / exit car |
-| Space | Punch |
-| P | Pause |
-| Mouse drag | Rotate camera |
+- **W A S D** — walk / drive · **Shift** — run · **Mouse** — look around
+- **E** — enter / exit a car (stealing a car raises your wanted level)
+- **F** or **click** — punch · **Space** — handbrake while driving
+- **Esc** — pause · **M** — mute
 
-## Play it
+## Run it
 
 ```sh
 node serve.ts
 # open http://localhost:8080
 ```
 
-## Screenshots
+Screenshots live in `screenshots/` (the first by name is the cover).
+The entry is handed in by `main.ts`, which copies `game/` and
+`screenshots/` to the output directory and writes `dossier.json`.
 
-Deterministic shots (`?shot=...&seed=1`): `1-chase` (cover: getaway with
-wanted stars, minimap and objective), `2-city` (downtown on foot),
-`3-mission` (harbour beacon + mission dialog), `4-police` (wanted 4 standoff).
-Retake them with the headless shell in `shots.json` after any visual change.
+## Credits
 
-## Source layout
-
-- `game/index.html` — canvas + HUD + menu
-- `game/src/main.js` — game loop and state machine
-- `game/src/city.js` — procedural city (roads, towers, harbour, beach)
-- `game/src/player.js` — Rio on foot + melee combat
-- `game/src/vehicles.js` — low-poly cars, driving, stealing
-- `game/src/traffic.js` — NPC cars and pedestrians
-- `game/src/police.js` — wanted level, patrols, foot cops
-- `game/src/missions.js` — four missions, beacons, rewards
-- `game/src/hud.js` — HUD + minimap
-- `game/src/audio.js` — synthesised WebAudio sounds
-- `game/src/save.js` — localStorage save / load
-- `game/src/shots.js` — deterministic screenshot scenes
-- `game/src/config.js`, `game/src/random.js` — tuning + seeded RNG
-- `game/vendor/three.min.js` — vendored three.js (U)
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Built by [@anzzz](https://make.fun/u/anzzz) for make.fun gta6-01.
+three.js (r160) is vendored under `game/vendor/three.min.js`.
