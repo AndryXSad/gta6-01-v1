@@ -1,5 +1,9 @@
-// Solmar — small deterministic RNG so every screenshot run looks the same.
-// mulberry32 is tiny, fast and good enough for placement, colours and traffic.
+// SOLMAR — deterministic RNG.
+//
+// One seeded stream drives city layout, traffic colours and police spawns,
+// so a screenshot run with the same seed always stages the same scene.
+// mulberry32 is small, fast and plenty random for placement work.
+
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -11,6 +15,7 @@ export function mulberry32(seed) {
   };
 }
 
+// FNV-1a hash: turns an arbitrary seed string into a uint32.
 export function hashSeed(text) {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) {
@@ -20,6 +25,8 @@ export function hashSeed(text) {
   return h >>> 0;
 }
 
+// A friendly wrapper around one mulberry32 stream: ranges, ints, picks,
+// coin flips and an in-place-style shuffle that never mutates its input.
 export function makeRng(seed) {
   const next = mulberry32(typeof seed === 'number' ? seed : hashSeed(String(seed)));
   return {
@@ -42,7 +49,6 @@ export function makeRng(seed) {
   };
 }
 
-// Fisher-Yates shuffle that reuses the same rng stream.
 export function shuffle(rng, list) {
   const out = list.slice();
   for (let i = out.length - 1; i > 0; i--) {

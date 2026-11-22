@@ -1,7 +1,7 @@
-// Solmar sound — everything synthesised with WebAudio (oscillators + a noise
-// buffer), no audio files. The context is created lazily on the first user
-// gesture (browser autoplay rules); every method is a safe no-op before that,
-// so shot mode and headless runs never crash on sound.
+// SOLMAR sound — everything synthesised with WebAudio (oscillators plus a
+// noise buffer), no audio files at all. The context is created lazily on
+// the first user gesture (browser autoplay rules); every method is a safe
+// no-op before that, so shot mode and headless runs never crash on sound.
 let ctx = null;
 let master = null;
 let engineOsc = null;
@@ -21,6 +21,26 @@ function ensure() {
   } catch (e) {
     return false;
   }
+}
+
+// Short burst of filtered noise — the raw material for punches and shots.
+function noiseBurst({ seconds, type, freq, vol }) {
+  if (!ensure()) return;
+  const t = ctx.currentTime;
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filter = ctx.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.value = freq;
+  const g = ctx.createGain();
+  g.gain.value = vol;
+  src.connect(filter);
+  filter.connect(g);
+  g.connect(master);
+  src.start(t);
 }
 
 export const audio = {
@@ -53,43 +73,11 @@ export const audio = {
   },
 
   punch() {
-    if (!ensure()) return;
-    const t = ctx.currentTime;
-    const len = 0.12;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 420;
-    const g = ctx.createGain();
-    g.gain.value = 0.7;
-    src.connect(f);
-    f.connect(g);
-    g.connect(master);
-    src.start(t);
+    noiseBurst({ seconds: 0.12, type: 'lowpass', freq: 420, vol: 0.7 });
   },
 
   gunshot() {
-    if (!ensure()) return;
-    const t = ctx.currentTime;
-    const len = 0.09;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const f = ctx.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = 900;
-    const g = ctx.createGain();
-    g.gain.value = 0.5;
-    src.connect(f);
-    f.connect(g);
-    g.connect(master);
-    src.start(t);
+    noiseBurst({ seconds: 0.09, type: 'highpass', freq: 900, vol: 0.5 });
   },
 
   engineStart() {

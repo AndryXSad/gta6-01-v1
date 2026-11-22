@@ -1,6 +1,6 @@
-// Solmar save — progress (mission, cash, health, position, wanted) in
+// SOLMAR save — progress (mission, cash, health, position, wanted) in
 // localStorage under a versioned key, so a corrupt or stale save can never
-// break a fresh game. Everything is validated on load.
+// break a fresh game. Every field is validated on load.
 import { SAVE_KEY, START_CASH, PLAYER } from './config.js';
 
 export function defaultSave() {
@@ -17,6 +17,11 @@ export function defaultSave() {
   };
 }
 
+function cleanNumber(value, fallback, min, max) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+
 export function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
@@ -25,14 +30,12 @@ export function loadSave() {
     if (!data || data.version !== 1) return null;
     const clean = defaultSave();
     clean.missionIndex = Number.isInteger(data.missionIndex) ? Math.max(0, data.missionIndex) : 0;
-    clean.cash = Number.isFinite(data.cash) ? Math.max(0, Math.floor(data.cash)) : START_CASH;
-    clean.health = Number.isFinite(data.health)
-      ? Math.max(1, Math.min(PLAYER.maxHealth, data.health))
-      : PLAYER.maxHealth;
+    clean.cash = cleanNumber(Math.floor(data.cash), START_CASH, 0, 999999);
+    clean.health = cleanNumber(data.health, PLAYER.maxHealth, 1, PLAYER.maxHealth);
     clean.wanted = Number.isInteger(data.wanted) ? Math.max(0, Math.min(5, data.wanted)) : 0;
-    clean.x = Number.isFinite(data.x) ? data.x : 0;
-    clean.z = Number.isFinite(data.z) ? data.z : 30;
-    clean.heading = Number.isFinite(data.heading) ? data.heading : 0;
+    clean.x = cleanNumber(data.x, 0, -260, 260);
+    clean.z = cleanNumber(data.z, 30, -260, 260);
+    clean.heading = cleanNumber(data.heading, 0, -Math.PI * 4, Math.PI * 4);
     clean.completed = Array.isArray(data.completed) ? data.completed.filter((m) => typeof m === 'string') : [];
     return clean;
   } catch (e) {
@@ -70,9 +73,8 @@ export function hasSave() {
   return loadSave() !== null;
 }
 
-// One-line summary for the start screen ("Continue — Misi 2, $370").
+// One-line summary for the start screen ("Misi 2 dari 4 · 1 selesai · $370").
 export function saveSummary(save) {
   if (!save) return '';
-  const done = save.completed.length;
-  return `Misi ${save.missionIndex + 1} dari 4 · ${done} selesai · $${save.cash}`;
+  return `Misi ${save.missionIndex + 1} dari 4 · ${save.completed.length} selesai · $${save.cash}`;
 }
