@@ -3,86 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SOLMAR — Open-World Crime</title>
+<title>Solmar — Open World</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1520;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  .hud { position: fixed; z-index: 5; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
-  #hud-top-left { top: 14px; left: 14px; }
-  #hud-health-wrap { width: 210px; height: 12px; background: rgba(0,0,0,.55);
-    border: 1px solid rgba(255,255,255,.5); border-radius: 6px; overflow: hidden; }
-  #hud-health-bar { height: 100%; width: 100%; background: #2ecc71; }
-  #hud-health { font-weight: 700; font-size: 15px; margin-top: 4px; }
-  #hud-armor { font-size: 13px; color: #7fb8ff; margin-top: 2px; }
-  #hud-top-right { top: 14px; right: 14px; text-align: right; }
-  #hud-stars { font-size: 24px; letter-spacing: 2px; color: #ffd23e; }
-  #hud-money { font-size: 22px; font-weight: 800; color: #7CFC9A; }
-  #hud-clock { font-size: 15px; opacity: .9; }
-  #hud-objective { left: 14px; bottom: 14px; font-size: 15px; max-width: 46vw;
-    background: rgba(0,0,0,.45); padding: 8px 10px; border-radius: 8px; }
-  #hud-dialog { left: 14px; bottom: 64px; font-size: 14px; font-style: italic;
-    max-width: 46vw; background: rgba(0,0,0,.4); padding: 6px 10px; border-radius: 8px; }
-  #hud-toast { left: 50%; top: 18%; transform: translateX(-50%); font-size: 20px;
-    font-weight: 800; color: #ffe27a; background: rgba(0,0,0,.55); padding: 8px 16px;
-    border-radius: 10px; transition: opacity .3s; }
-  #hud-speed { right: 18px; bottom: 16px; font-size: 26px; font-weight: 800; }
-  #hud-prompt { left: 50%; bottom: 90px; transform: translateX(-50%); font-size: 16px;
-    font-weight: 700; background: rgba(0,0,0,.55); padding: 6px 12px; border-radius: 8px; }
-  #minimap { position: fixed; right: 14px; bottom: 64px; z-index: 5;
-    width: 150px; height: 150px; border-radius: 8px; background: rgba(0,0,0,.4); }
-  #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 14px;
-    background: linear-gradient(180deg, rgba(8,20,40,.82), rgba(8,20,40,.55)); text-align: center; }
-  #menu h1 { font-size: 64px; margin: 0; letter-spacing: 8px; color: #ffd23e;
-    text-shadow: 0 4px 0 #c0392b, 0 8px 24px rgba(0,0,0,.7); }
-  #menu p { margin: 0; max-width: 560px; font-size: 16px; line-height: 1.5; opacity: .95; }
-  #menu .controls { font-size: 13px; opacity: .8; }
-  #menu button { pointer-events: auto; font-size: 18px; font-weight: 700; padding: 12px 28px;
-    border: 0; border-radius: 10px; cursor: pointer; background: #ffd23e; color: #222; }
-  #menu button.secondary { background: #2f7fb8; color: #fff; }
-  #menu button:hover { filter: brightness(1.1); }
-  #menu-note { font-size: 14px; color: #ffe27a; min-height: 20px; }
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden;
-    clip-path: inset(50%); white-space: nowrap; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0b0e13; font-family: 'Segoe UI', system-ui, sans-serif; }
+  #game, #game canvas { width: 100vw; height: 100vh; display: block; }
+  .panel { position: fixed; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); z-index: 5; user-select: none; }
+  #hud-top-left { top: 14px; left: 16px; }
+  #health-bar { width: 210px; height: 14px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); border-radius: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #43aa5b; }
+  #health-text { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  #cash { font-size: 22px; font-weight: 800; margin-top: 6px; color: #7dff9b; }
+  #stars { font-size: 24px; letter-spacing: 3px; margin-top: 2px; }
+  #hud-top-right { top: 14px; right: 16px; text-align: right; }
+  #clock { font-size: 22px; font-weight: 800; }
+  #objective { font-size: 15px; font-weight: 700; margin-top: 4px; color: #ffd60a; max-width: 340px; }
+  #brief { font-size: 13px; max-width: 340px; opacity: .92; margin-top: 2px; }
+  #minimap { position: fixed; right: 16px; bottom: 16px; width: 172px; height: 172px; border: 2px solid rgba(255,255,255,.65); border-radius: 8px; background: #274d33; z-index: 5; }
+  #speed { position: fixed; right: 16px; bottom: 200px; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.8); z-index: 5; }
+  #banner { top: 22%; left: 50%; transform: translateX(-50%); font-size: 26px; font-weight: 800; color: #ffd60a; opacity: 0; transition: opacity .4s; text-align: center; width: 80%; }
+  #toast { bottom: 110px; left: 50%; transform: translateX(-50%); font-size: 15px; background: rgba(0,0,0,.65); padding: 8px 16px; border-radius: 6px; opacity: 0; transition: opacity .4s; white-space: nowrap; }
+  #help { bottom: 12px; left: 16px; font-size: 12.5px; opacity: .85; }
+  #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(8,20,40,.82), rgba(8,20,40,.55)); color: #fff; text-align: center; }
+  #menu h1 { font-size: 64px; margin: 0; letter-spacing: 6px; color: #ffd60a; text-shadow: 0 4px 0 #b8860b, 0 8px 24px rgba(0,0,0,.6); }
+  #menu h2 { font-size: 18px; font-weight: 400; margin: 8px 0 4px; opacity: .95; }
+  #menu p { max-width: 520px; font-size: 14.5px; line-height: 1.55; opacity: .92; }
+  #menu-summary { font-size: 14px; color: #7dff9b; min-height: 20px; }
+  .menu-btn { display: inline-block; margin: 10px 6px 0; padding: 13px 34px; font-size: 17px; font-weight: 700; color: #122; background: #ffd60a; border: none; border-radius: 8px; cursor: pointer; }
+  .menu-btn:hover { background: #ffe14d; }
+  .menu-btn.secondary { background: #e8e8e8; }
+  #btn-continue { display: none; }
+  .keys { font-size: 12.5px; opacity: .8; margin-top: 18px; }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Game open-world Solmar"></canvas>
-<div id="status" aria-live="polite"></div>
+<div id="game"></div>
 
-<div class="hud" id="hud-top-left">
-  <div id="hud-health-wrap"><div id="hud-health-bar"></div></div>
-  <div id="hud-health">HP 100</div>
-  <div id="hud-armor"></div>
+<div id="hud-top-left" class="panel">
+  <div id="health-bar"><div id="health-fill"></div></div>
+  <div id="health-text">100</div>
+  <div id="cash">$120</div>
+  <div id="stars">☆☆☆☆☆</div>
 </div>
-<div class="hud" id="hud-top-right">
-  <div id="hud-stars">☆☆☆☆☆</div>
-  <div id="hud-money">$0</div>
-  <div id="hud-clock">09:40</div>
+
+<div id="hud-top-right" class="panel">
+  <div id="clock">10:00</div>
+  <div id="objective"></div>
+  <div id="brief"></div>
 </div>
-<div class="hud" id="hud-dialog"></div>
-<div class="hud" id="hud-objective"></div>
-<div class="hud" id="hud-toast"></div>
-<div class="hud" id="hud-speed"></div>
-<div class="hud" id="hud-prompt"></div>
-<canvas id="minimap" width="150" height="150" aria-label="Minimap kota Solmar"></canvas>
+
+<div id="banner" class="panel"></div>
+<div id="toast" class="panel"></div>
+<div id="help" class="panel">WASD gerak &middot; E masuk/keluar mobil &middot; Spasi pukul &middot; P jeda &middot; drag mouse putar kamera.</div>
+<div id="speed"></div>
+<canvas id="minimap" width="172" height="172"></canvas>
 
 <div id="menu">
   <h1>SOLMAR</h1>
-  <p><strong>Kota pesisir. Satu kurir. Satu utang.</strong><br>
-  Rio, kurir pelabuhan, berutang pada Madame Kestrel. Empat pekerjaan —
-  antar paket, curi mobil, jemput Sari, getaway terakhir — sambil polisi
-  Solmar mengejar di tiap tikungan.</p>
-  <p class="controls">WASD jalan / mengemudi &nbsp;•&nbsp; Shift lari &nbsp;•&nbsp; Drag mouse putar kamera<br>
-  E masuk / keluar / curi mobil &nbsp;•&nbsp; Space pukul / rem tangan &nbsp;•&nbsp; P jeda<br>
-  Misi selesai memberi uang; uang &amp; progres tersimpan otomatis.</p>
+  <h2>Kota pesisir. Utang besar. Satu kurir yang tak bisa diam.</h2>
+  <p>Rio, kurir pelabuhan, berutang pada Madame Kestrel. Kerjakan 4 misi di kota
+  terbuka Solmar: antar paket, curi mobil, jemput rekan, dan kabur lewat highway —
+  sambil polisi menghitung bintang wanted-mu.</p>
+  <div id="menu-summary"></div>
   <div>
-    <button id="btn-start">Mulai Baru</button>
-    <button id="btn-continue" class="secondary">Lanjutkan</button>
-    <button id="btn-resume" class="secondary" style="display:none">Lanjut</button>
+    <button id="btn-new" class="menu-btn">▶ New Game</button>
+    <button id="btn-continue" class="menu-btn secondary">↻ Continue</button>
   </div>
-  <div id="menu-note"></div>
+  <div class="keys">WASD jalan / mengemudi &middot; Shift lari &middot; E masuk &amp; keluar mobil &middot; Spasi pukul &middot; P jeda &middot; drag mouse untuk kamera &middot; progres tersimpan otomatis</div>
 </div>
 
 <script src="./vendor/three.min.js"></script>

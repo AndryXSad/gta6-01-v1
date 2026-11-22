@@ -1,127 +1,97 @@
-// Mode screenshot deterministik Solmar: ?shot=chase|city|mission|police&seed=N
-// Menata adegan (posisi pemain, mobil, wanted, misi aktif) lalu membekukan
-// simulasi supaya tiap screenshot bisa diulang persis. Dipakai main.js
-// sebelum loop pertama; saat shot aktif, input & HUD menu dimatikan.
-import { CFG } from './config.js';
-import { hashSeed, mulberry32 } from './random.js';
-
+// Deterministic screenshot mode: ?shot=chase|city|mission|police&seed=N
+// Stages one scene per shot (player spot, car, wanted level, active mission),
+// then lets the game run a few fixed frames so traffic and police settle.
+// main.js calls applyShot() once at boot and sets window.__shotReady when the
+// scene has rendered enough frames for a headless capture.
 export function parseShot() {
-  const q = new URLSearchParams(window.location.search);
+  const q = new URLSearchParams(location.search);
   const shot = q.get('shot');
   if (!shot) return null;
-  const seed = Number(q.get('seed') || '1') || 1;
-  return { shot, seed, rng: mulberry32(hashSeed(`solmar-${shot}-${seed}`)) };
+  return { name: shot, seed: Number(q.get('seed') || 1) };
 }
 
-// Posisikan dunia untuk tiap shot. Mengembalikan {frozen:true} bila shot
-// dikenali — main.js lalu merender beberapa frame lalu berhenti update.
-export function applyShot(game, info) {
-  const { shot } = info;
-  const { player, vehicles, police, missions, traffic, city } = game;
-  const setPlayer = (x, z, heading) => {
-    player.pos.set(x, 0, z);
-    player.heading = heading;
-    player.camYaw = heading + Math.PI;
-    player.group.position.copy(player.pos);
-    player.group.rotation.y = heading;
-  };
-  // Beacon & ring mengikuti misi aktif (di mode beku missions.update tidak
-  // jalan, jadi penanda harus diposisikan manual di sini).
-  const placeBeacon = () => {
-    const cur = missions.current();
-    if (!cur) return;
-    missions.beacon.position.set(cur.target.x, 15, cur.target.z);
-    missions.ring.position.set(cur.target.x, 0.2, cur.target.z);
-  };
-  if (shot === 'chase') {
-    // Cover: Rio mengemudi dikejar 2 patroli, wanted 3, misi getaway aktif.
-    // Mobil pemain di highway utara (z -140) menghadap selatan (+z) supaya
-    // kamera di belakangnya menangkap jalan lurus + patroli di belakang.
-    missions.index = 3;
-    const car = vehicles.heroCar;
-    vehicles.enterCar(car, player);
-    car.pos.set(-20, 0, -140);
-    car.heading = Math.PI;
-    car.speed = 26;
-    car.group.position.copy(car.pos);
-    car.group.rotation.y = car.heading;
-    // Kamera mengikuti player.pos — di mode beku vehicles.update tidak
-    // jalan, jadi sinkronkan posisi pemain ke mobil secara manual.
-    player.pos.copy(car.pos);
+// game: the object main.js builds {player, cars, police, missions, traffic, state, ...}
+// Returns the camera preset for this shot: {dist, height, yawOffset}.
+export function applyShot(game, shot) {
+  const { player, police, missions, state } = game;
+  state.shotMode = true;
+  state.paused = false;
+  state.started = true;
+
+  const putPlayerInCar = (car) => {
+    player.inCar = car;
+    car.owner = 'player';
+    player.x = car.x;
+    player.z = car.z;
     player.heading = car.heading;
-    player.camYaw = Math.PI;
-    police.addHeat(60, 'shot-chase');
-    police.syncUnits();
-    // Patroli di sisi depan mobil (dalam frame kamera yang melihat ke
-    // selatan) — seolah memotong jalur pelarian dari arah depan.
-    police.patrols.forEach((p, i) => {
-      p.pos.set(-20 + (i === 0 ? -9 : 10), 0, -140 + 30 + i * 12);
-      p.heading = 0;
-      p.speed = 22;
-      p.group.position.copy(p.pos);
-      p.group.rotation.y = p.heading;
-    });
-    placeBeacon();
-    missions.setToast('Getaway Terakhir: lolos lewat highway utara!', 99);
-    return { frozen: true, note: 'chase' };
-  }
-  if (shot === 'city') {
-    // Rio jalan kaki di pusat kota, traffic + pejalan kaki di sekitar.
-    setPlayer(6, 6, Math.PI * 0.75);
-    missions.index = 0;
-    placeBeacon();
-    traffic.peds.slice(0, 6).forEach((p, i) => {
-      p.pos.set(10 + i * 5, 0, 14 + (i % 2) * 6);
-      p.group.position.copy(p.pos);
-    });
-    traffic.cars.slice(0, 4).forEach((c, i) => {
-      c.pos.set(-30 + i * 22, 0, 0);
-      c.heading = -Math.PI / 2;
-      c.group.rotation.y = c.heading;
-    });
-    return { frozen: true, note: 'city' };
-  }
-  if (shot === 'mission') {
-    // Momen misi 1: Rio di tepi dermaga terbuka menghadap tumpukan kontainer
-    // + beacon pelabuhan. Kamera di belakang (timur) melihat ke barat.
-    setPlayer(-140, 150, Math.PI / 2);
-    player.camYaw = Math.PI / 2;
-    missions.index = 0;
-    placeBeacon();
-    missions.setToast('Paket Pelabuhan: antar paket ke dermaga barat.', 99);
-    traffic.cars.slice(0, 2).forEach((c, i) => {
-      c.pos.set(-150 + i * 18, 0, 120);
-      c.heading = Math.PI / 2;
-      c.group.rotation.y = c.heading;
-    });
-    return { frozen: true, note: 'mission' };
-  }
-  if (shot === 'police') {
-    // Polisi mengejar Rio jalan kaki di plaza, wanted 2. Kamera di selatan
-    // pemain (camYaw 0) melihat ke utara: petugas & patroli di depan frame.
-    setPlayer(0, -10, 0);
-    player.camYaw = 0;
+    player.mesh.visible = false;
+  };
+
+  if (shot.name === 'chase') {
+    // cover: Rio fleeing in a red car, wanted 3, two patrol cars on his tail,
+    // mission 2 (hotwire) active so the objective shows in the HUD.
+    const car = game.cars.find((c) => c.owner === 'parked') || game.cars[0];
+    car.x = 0;
+    car.z = -40;
+    car.heading = Math.PI;
+    car.speed = 22;
+    putPlayerInCar(car);
+    game.camYaw = Math.PI;
+    state.cash = 370;
     missions.index = 1;
-    placeBeacon();
-    police.addHeat(30, 'shot-police');
-    police.syncUnits();
-    police.officers.forEach((o, i) => {
-      o.pos.set(-8 + i * 9, 0, -30);
-      o.group.position.copy(o.pos);
-    });
-    police.patrols.forEach((p, i) => {
-      p.pos.set(16 + i * 12, 0, -36);
-      p.heading = Math.PI;
-      p.speed = 8;
-      p.group.position.copy(p.pos);
-      p.group.rotation.y = p.heading;
-    });
-    missions.setToast('Wanted ★★ — polisi mengejar!', 99);
-    return { frozen: true, note: 'police' };
+    const m = missions.active;
+    startMissionAt(game, 1);
+    police.wanted = 3;
+    police.unseen = 0;
+    // pull two patrol cars right behind the player
+    game.police.patrols.length = 0;
+    return { dist: 13, height: 5.2, yawOffset: 0 };
   }
-  return null;
+
+  if (shot.name === 'city') {
+    // on foot downtown, traffic and pedestrians around, morning light
+    player.x = 23;
+    player.z = 23;
+    player.heading = Math.PI * 0.75;
+    game.camYaw = Math.PI * 0.75;
+    state.cash = 120;
+    startMissionAt(game, 0);
+    police.wanted = 0;
+    return { dist: 10, height: 4.4, yawOffset: 0 };
+  }
+
+  if (shot.name === 'mission') {
+    // standing at the harbour beacon with the mission dialog in the HUD
+    player.x = 12;
+    player.z = -178;
+    player.heading = Math.PI;
+    game.camYaw = Math.PI;
+    state.cash = 120;
+    startMissionAt(game, 0);
+    police.wanted = 0;
+    return { dist: 11, height: 5, yawOffset: 0 };
+  }
+
+  if (shot.name === 'police') {
+    // wanted 4: patrol cars closing in from two sides, Rio on foot
+    player.x = -46;
+    player.z = 0;
+    player.heading = Math.PI / 2;
+    game.camYaw = Math.PI / 2;
+    state.cash = 620;
+    startMissionAt(game, 2);
+    police.wanted = 4;
+    police.unseen = 0;
+    return { dist: 15, height: 6, yawOffset: 0.5 };
+  }
+
+  // unknown shot name: fall back to a plain city view
+  startMissionAt(game, 0);
+  return { dist: 11, height: 5, yawOffset: 0 };
 }
 
-// Nama file screenshot yang diharapkan (cocok shots.json di repo).
-export const SHOT_FILES = ['1-chase.jpg', '2-city.jpg', '3-mission.jpg', '4-police.jpg'];
-export const SHOT_NAMES = ['chase', 'city', 'mission', 'police'];
+function startMissionAt(game, index) {
+  // missions.js exports startMission; re-exported here to keep main.js thin.
+  game.missions.index = index;
+  game.startMission(index);
+}

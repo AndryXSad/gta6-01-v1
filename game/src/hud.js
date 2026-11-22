@@ -1,125 +1,142 @@
-// HUD Solmar: health/armor/uangan/bintang wanted/jam kota/objektif/toast,
-// plus minimap canvas 2D top-down (jalan, laut, pemain, polisi, traffic,
-// penanda misi). Semua DOM sudah ada di index.html.
-import { CFG } from './config.js';
+// Solmar HUD — health bar, cash, wanted stars, city clock, objective text and
+// toasts, plus a 2D top-down minimap (roads, sea, player, police, traffic and
+// the mission marker). All DOM nodes already exist in index.html.
+import { WORLD } from './config.js';
 
-export function createHud(doc) {
-  const $ = (id) => doc.getElementById(id);
-  const el = {
-    health: $('hud-health'), healthBar: $('hud-health-bar'),
-    armor: $('hud-armor'), money: $('hud-money'),
-    stars: $('hud-stars'), clock: $('hud-clock'),
-    objective: $('hud-objective'), dialog: $('hud-dialog'),
-    toast: $('hud-toast'), speed: $('hud-speed'),
-    prompt: $('hud-prompt'), menu: $('menu'), minimap: $('minimap'),
-  };
-  const ctx = el.minimap ? el.minimap.getContext('2d') : null;
-
-  function starString(n) {
-    let s = '';
-    for (let i = 0; i < CFG.wantedMax; i++) s += i < n ? '★' : '☆';
-    return s;
-  }
-
-  function clockString(minutes) {
-    const h = Math.floor(minutes / 60) % 24;
-    const m = Math.floor(minutes % 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-
+export function createHud() {
+  const $ = (id) => document.getElementById(id);
   return {
-    el,
-
-    showMenu(show) {
-      if (el.menu) el.menu.style.display = show ? 'flex' : 'none';
-    },
-
-    setPrompt(text) {
-      if (el.prompt) el.prompt.textContent = text || '';
-    },
-
-    update(state) {
-      const { player, police, missions, minutes, speedKmh, driving } = state;
-      if (el.health) el.health.textContent = `HP ${Math.ceil(player.health)}`;
-      if (el.healthBar) el.healthBar.style.width = `${player.health}%`;
-      if (el.armor) el.armor.textContent = player.armor > 0 ? `Armor ${Math.ceil(player.armor)}` : '';
-      if (el.money) el.money.textContent = `$${player.money}`;
-      if (el.stars) {
-        el.stars.textContent = starString(police.stars);
-        el.stars.style.color = police.stars > 0 ? '#ffd23e' : '#ffffff';
-      }
-      if (el.clock) el.clock.textContent = clockString(minutes);
-      if (el.objective) el.objective.textContent = missions.objectiveText();
-      if (el.dialog) el.dialog.textContent = missions.dialogText();
-      if (el.toast) {
-        el.toast.textContent = missions.toastTimer > 0 ? missions.toast : '';
-        el.toast.style.opacity = missions.toastTimer > 0 ? '1' : '0';
-      }
-      if (el.speed) {
-        el.speed.textContent = driving ? `${Math.round(speedKmh)} km/h` : '';
-      }
-      if (ctx && el.minimap) drawMinimap(ctx, state);
-    },
+    healthFill: $('health-fill'),
+    healthText: $('health-text'),
+    cash: $('cash'),
+    stars: $('stars'),
+    clock: $('clock'),
+    objective: $('objective'),
+    brief: $('brief'),
+    banner: $('banner'),
+    toast: $('toast'),
+    minimap: $('minimap'),
+    menu: $('menu'),
+    menuSummary: $('menu-summary'),
+    help: $('help'),
+    toastTimer: 0,
   };
+}
 
-  function drawMinimap(c, state) {
-    const { player, police, missions, traffic, vehicles } = state;
-    const W = 150, H = 150;
-    const half = CFG.worldHalf;
-    const toMap = (x, z) => [((x + half) / (half * 2)) * W, ((z + half) / (half * 2)) * H];
-    c.clearRect(0, 0, W, H);
-    c.fillStyle = '#20242c';
-    c.fillRect(0, 0, W, H);
-    // Laut di selatan.
-    c.fillStyle = '#2f7fb8';
-    c.fillRect(0, H * 0.93, W, H * 0.07);
-    // Jalan grid.
-    c.strokeStyle = '#5a5f6a';
-    c.lineWidth = 3;
-    for (const x of CFG.gridXs) {
-      const [mx] = toMap(x, 0);
-      c.beginPath(); c.moveTo(mx, 0); c.lineTo(mx, H); c.stroke();
-    }
-    for (const z of CFG.gridZs) {
-      const [, mz] = toMap(0, z);
-      c.beginPath(); c.moveTo(0, mz); c.lineTo(W, mz); c.stroke();
-    }
-    // Penanda misi (kuning berdenyut).
-    const cur = missions.current();
-    if (cur) {
-      const [mx, mz] = toMap(cur.target.x, cur.target.z);
-      c.fillStyle = '#f5d76e';
-      c.beginPath(); c.arc(mx, mz, 5 + Math.sin(Date.now() * 0.006) * 1.5, 0, Math.PI * 2); c.fill();
-    }
-    // Traffic (abu-abu), mobil parkir (putih kecil).
-    c.fillStyle = '#9aa0aa';
-    for (const t of traffic.cars) {
-      const [mx, mz] = toMap(t.pos.x, t.pos.z);
-      c.fillRect(mx - 1.5, mz - 1.5, 3, 3);
-    }
-    // Polisi (biru/merah).
-    for (const p of police.patrols) {
-      const [mx, mz] = toMap(p.pos.x, p.pos.z);
-      c.fillStyle = '#ff4444';
-      c.beginPath(); c.arc(mx, mz, 3.5, 0, Math.PI * 2); c.fill();
-    }
-    for (const o of police.officers) {
-      const [mx, mz] = toMap(o.pos.x, o.pos.z);
-      c.fillStyle = '#4488ff';
-      c.fillRect(mx - 2, mz - 2, 4, 4);
-    }
-    // Pemain (panah hijau menghadap heading). Minimap: utara = -z ke atas,
-    // jadi rotasi panah memakai heading yang sama dengan dunia game.
-    const [px, py] = toMap(player.pos.x, player.pos.z);
-    c.save();
-    c.translate(px, py);
-    c.rotate(-player.heading);
-    c.fillStyle = '#2ecc71';
-    c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
-    c.restore();
-    // Bingkai.
-    c.strokeStyle = '#f5d76e';
-    c.lineWidth = 2;
-    c.strokeRect(1, 1, W - 2, H - 2);
+export function showToast(hud, text, seconds = 3) {
+  hud.toast.textContent = text;
+  hud.toast.style.opacity = '1';
+  hud.toastTimer = seconds;
+}
+
+export function showBanner(hud, text, seconds = 3.2) {
+  hud.banner.textContent = text;
+  hud.banner.style.opacity = '1';
+  setTimeout(() => {
+    hud.banner.style.opacity = '0';
+  }, seconds * 1000);
+}
+
+export function updateHud(hud, dt, state) {
+  // state: {health, maxHealth, cash, wanted, clockMin, objective, brief, banner}
+  const hp = Math.max(0, Math.round(state.health));
+  hud.healthFill.style.width = `${(hp / state.maxHealth) * 100}%`;
+  hud.healthFill.style.background = hp > 50 ? '#43aa5b' : hp > 25 ? '#e0a458' : '#e63946';
+  hud.healthText.textContent = `${hp}`;
+  hud.cash.textContent = `$${Math.floor(state.cash)}`;
+  hud.stars.textContent = '★'.repeat(state.wanted) + '☆'.repeat(5 - state.wanted);
+  hud.stars.style.color = state.wanted > 0 ? '#ffd60a' : '#888';
+  const hh = String(Math.floor(state.clockMin / 60) % 24).padStart(2, '0');
+  const mm = String(Math.floor(state.clockMin % 60)).padStart(2, '0');
+  hud.clock.textContent = `${hh}:${mm}`;
+  hud.objective.textContent = state.objective;
+  hud.brief.textContent = state.brief;
+  if (hud.toastTimer > 0) {
+    hud.toastTimer -= dt;
+    if (hud.toastTimer <= 0) hud.toast.style.opacity = '0';
   }
+}
+
+export function drawMinimap(hud, world) {
+  // world: {playerX, playerZ, heading, inCar, target, police: [{x,z}], traffic: [{x,z}], peds: [{x,z}]}
+  const c = hud.minimap;
+  if (!c) return;
+  const g = c.getContext('2d');
+  const W = c.width;
+  const H = c.height;
+  const half = WORLD.size / 2;
+  const toMap = (x, z) => [((x + half) / WORLD.size) * W, ((z + half) / WORLD.size) * H];
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#274d33';
+  g.fillRect(0, 0, W, H);
+  // sea
+  const [, seaY] = toMap(0, WORLD.waterAt);
+  g.fillStyle = '#2a6f9e';
+  g.fillRect(0, 0, W, seaY);
+  // sand
+  g.fillStyle = '#d9c28a';
+  const [, sandY] = toMap(0, WORLD.beachAt);
+  g.fillRect(0, seaY, W, sandY - seaY);
+  // roads
+  g.strokeStyle = '#55595e';
+  g.lineWidth = 3;
+  for (let x = -207; x <= 207; x += WORLD.roadGap) {
+    const [mx] = toMap(x, 0);
+    g.beginPath();
+    g.moveTo(mx, 0);
+    g.lineTo(mx, H);
+    g.stroke();
+  }
+  for (let z = -207; z <= 207; z += WORLD.roadGap) {
+    const [, mz] = toMap(0, z);
+    g.beginPath();
+    g.moveTo(0, mz);
+    g.lineTo(W, mz);
+    g.stroke();
+  }
+  // ring highway
+  g.strokeStyle = '#777';
+  g.lineWidth = 2;
+  g.beginPath();
+  const [ccx, ccy] = toMap(0, 0);
+  g.arc(ccx, ccy, (WORLD.highwayRadius / WORLD.size) * W, 0, Math.PI * 2);
+  g.stroke();
+  // mission target
+  if (world.target) {
+    const [tx, ty] = toMap(world.target[0], world.target[1]);
+    g.fillStyle = '#ffd60a';
+    g.beginPath();
+    g.arc(tx, ty, 5, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#fff';
+    g.lineWidth = 1.5;
+    g.stroke();
+  }
+  // traffic dots
+  g.fillStyle = '#cfd3d6';
+  for (const t of world.traffic || []) {
+    const [tx, ty] = toMap(t.x, t.z);
+    g.fillRect(tx - 1, ty - 1, 2, 2);
+  }
+  // police
+  g.fillStyle = '#3a86ff';
+  for (const p of world.police || []) {
+    const [px, py] = toMap(p.x, p.z);
+    g.beginPath();
+    g.arc(px, py, 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  // player arrow (rotates with heading)
+  const [px, py] = toMap(world.playerX, world.playerZ);
+  g.save();
+  g.translate(px, py);
+  g.rotate(Math.atan2(Math.sin(world.heading), Math.cos(world.heading)) * -1 + Math.PI);
+  g.fillStyle = world.inCar ? '#e63946' : '#ffffff';
+  g.beginPath();
+  g.moveTo(0, -7);
+  g.lineTo(5, 6);
+  g.lineTo(-5, 6);
+  g.closePath();
+  g.fill();
+  g.restore();
 }

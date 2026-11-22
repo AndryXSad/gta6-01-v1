@@ -1,137 +1,88 @@
-// Misi Solmar: 4 pekerjaan Rio untuk Madame Kestrel. Tiap misi punya
-// penanda beacon (silinder cahaya) + dialog singkat + hadiah uang.
-// Selesai semua = epilog "bebas utang" + bonus.
-import { CFG } from './config.js';
-
-const T = () => window.THREE;
-
-export const MISSION_DEFS = [
-  {
-    id: 'paket',
-    title: 'Paket Pelabuhan',
-    giver: 'Madame Kestrel',
-    text: 'Antar paket ini ke dermaga barat. Jangan berhenti di tengah jalan.',
-    target: CFG.spots.harbor,
-    reward: 120,
-    need: 'reach',
-    hint: 'Ikuti penanda kuning ke pelabuhan.',
-  },
-  {
-    id: 'curi',
-    title: 'Mobil untuk Ombak',
-    giver: 'Madame Kestrel',
-    text: 'Ombak butuh mobil bagus. Curi satu, bawa ke garasi timur. Polisi akan marah.',
-    target: CFG.spots.garage,
-    reward: 250,
-    need: 'stolenCar',
-    hint: 'Tekan E di dekat mobil parkir, lalu bawa ke garasi.',
-  },
-  {
-    id: 'jemput',
-    title: 'Jemput Sari',
-    giver: 'Sari',
-    text: 'Aku di boulevard pantai. Jemput aku sebelum patroli lewat sini!',
-    target: CFG.spots.boulevard,
-    reward: 200,
-    need: 'reach',
-    hint: 'Ke boulevard pantai di selatan.',
-  },
-  {
-    id: 'getaway',
-    title: 'Getaway Terakhir',
-    giver: 'Madame Kestrel',
-    text: 'Terakhir: bawa Sari lewat highway utara dan hilang. Utangmu lunas.',
-    target: CFG.spots.highwayNorth,
-    reward: 500,
-    need: 'reach',
-    hint: 'Highway utara — gas pol, jangan berhenti.',
-  },
-];
+// Solmar missions — four jobs Rio runs for Madame Kestrel, the harbour fixer
+// he owes. Each mission has a light beacon at its target, a short brief and a
+// cash reward. Finish all four and Rio is out of debt.
+import { MISSIONS } from './config.js';
+import { PALETTE } from './config.js';
 
 export function createMissions(scene) {
-  const THREE = T();
   const beaconMat = new THREE.MeshBasicMaterial({
-    color: 0xf5d76e, transparent: true, opacity: 0.45,
+    color: PALETTE.beacon,
+    transparent: true,
+    opacity: 0.32,
+    side: THREE.DoubleSide,
+    depthWrite: false,
   });
-  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 30, 18, 1, true), beaconMat);
-  beacon.position.set(0, 15, 0);
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 55, 20, 1, true), beaconMat);
+  beacon.position.y = 27;
+  beacon.visible = false;
   scene.add(beacon);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.4, 24),
-    new THREE.MeshBasicMaterial({ color: 0xf5d76e, side: THREE.DoubleSide }));
+
+  const ringMat = new THREE.MeshBasicMaterial({ color: PALETTE.beacon, transparent: true, opacity: 0.85 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(6.5, 8.5, 28), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.2;
+  ring.position.y = 0.12;
+  ring.visible = false;
   scene.add(ring);
 
-  const m = {
-    defs: MISSION_DEFS,
+  return {
+    scene,
+    beacon,
+    ring,
     index: 0,
-    done: false,
-    completedCount: 0,
-    earned: 0,
-    toast: '',
-    toastTimer: 0,
-    beacon, ring,
-
-    current() {
-      return m.index < m.defs.length ? m.defs[m.index] : null;
-    },
-
-    objectiveText() {
-      const cur = m.current();
-      if (m.done) return 'Semua misi selesai — Rio bebas utang!';
-      return cur ? `${cur.title}: ${cur.hint}` : '';
-    },
-
-    dialogText() {
-      const cur = m.current();
-      if (m.done) return 'Kestrel: "Utang lunas. Solmar milikmu sekarang, Rio."';
-      return cur ? `${cur.giver}: "${cur.text}"` : '';
-    },
-
-    setToast(text, seconds = 4) {
-      m.toast = text;
-      m.toastTimer = seconds;
-    },
-
-    completeCurrent(player) {
-      const cur = m.current();
-      if (!cur) return;
-      player.money += cur.reward;
-      m.earned += cur.reward;
-      m.completedCount += 1;
-      m.setToast(`Misi selesai: ${cur.title}  +$${cur.reward}`, 4.5);
-      m.index += 1;
-      if (m.index >= m.defs.length) {
-        m.done = true;
-        player.money += 300;
-        m.earned += 300;
-        m.setToast('SEMUA MISI SELESAI — bonus $300. Rio bebas utang!', 6);
-      }
-    },
-
-    // Dipanggil tiap frame: cek kedatangan di penanda.
-    update(dt, player, vehicles) {
-      m.toastTimer = Math.max(0, m.toastTimer - dt);
-      const cur = m.current();
-      if (!cur) {
-        beacon.visible = false;
-        ring.visible = false;
-        return;
-      }
-      beacon.position.set(cur.target.x, 15, cur.target.z);
-      ring.position.set(cur.target.x, 0.2, cur.target.z);
-      beacon.rotation.y += dt * 0.8;
-      const pulse = 0.35 + Math.sin(performance.now() * 0.004) * 0.12;
-      beaconMat.opacity = pulse;
-      const d = Math.hypot(player.pos.x - cur.target.x, player.pos.z - cur.target.z);
-      if (cur.need === 'reach' && d < 7) {
-        m.completeCurrent(player);
-      } else if (cur.need === 'stolenCar' && d < 9) {
-        const inStolen = vehicles.current && vehicles.current.stolen;
-        if (inStolen) m.completeCurrent(player);
-        else if (!vehicles.current) m.setToast('Bawa mobil curian ke sini — bukan jalan kaki!', 2);
-      }
-    },
+    active: null, // current mission def
+    done: [],
+    allDone: false,
+    banner: '',
+    bannerTimer: 0,
   };
-  return m;
+}
+
+export function startMission(m, index) {
+  m.index = index;
+  m.active = MISSIONS[index] || null;
+  m.allDone = !m.active;
+  if (m.active) {
+    m.beacon.position.set(m.active.target[0], 27, m.active.target[1]);
+    m.beacon.visible = true;
+    m.ring.position.set(m.active.target[0], 0.12, m.active.target[1]);
+    m.ring.visible = true;
+    m.banner = m.active.title;
+    m.bannerTimer = 3.2;
+  } else {
+    m.beacon.visible = false;
+    m.ring.visible = false;
+  }
+  return m.active;
+}
+
+// Returns the completed mission def when the player reaches the target.
+export function updateMissions(m, dt, player, events = {}) {
+  if (m.bannerTimer > 0) m.bannerTimer -= dt;
+  if (!m.active) return null;
+  m.beacon.rotation.y += dt * 0.8;
+  m.beacon.material.opacity = 0.24 + Math.sin(performance.now() / 280) * 0.08;
+  const dx = player.x - m.active.target[0];
+  const dz = player.z - m.active.target[1];
+  const d = Math.hypot(dx, dz);
+  if (d > m.active.radius) return null;
+  if (m.active.needCar && !player.inCar) {
+    m.banner = 'Butuh mobil — curi satu dulu (E di dekat mobil).';
+    m.bannerTimer = 2.5;
+    return null;
+  }
+  const done = m.active;
+  m.done.push(done.id);
+  if (events.onComplete) events.onComplete(done);
+  return startMission(m, m.index + 1) === null ? done : done;
+}
+
+export function missionObjective(m) {
+  if (m.allDone) return 'Semua misi selesai — Rio bebas utang!';
+  if (!m.active) return '';
+  return `Misi ${m.index + 1}/4: ${m.active.title}`;
+}
+
+export function missionBrief(m) {
+  if (m.allDone) return 'Madame Kestrel tersenyum. "Lunas. Solmar milikmu sekarang."';
+  return m.active ? m.active.brief : '';
 }
