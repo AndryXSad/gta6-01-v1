@@ -1,6 +1,5 @@
-// RNG deterministik untuk Solmar: mulberry32 + helper kecil. Dipakai kota
-// (tata gedung), traffic, dan mode screenshot agar hasil bisa diulang
-// dengan seed yang sama.
+// Solmar — small deterministic RNG so every screenshot run looks the same.
+// mulberry32 is tiny, fast and good enough for placement, colours and traffic.
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -12,39 +11,45 @@ export function mulberry32(seed) {
   };
 }
 
-// Ubah string pendek jadi seed angka (hash FNV-1a 32-bit).
 export function hashSeed(text) {
-  let h = 0x811c9dc5;
+  let h = 2166136261;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+    h = Math.imul(h, 16777619);
   }
   return h >>> 0;
 }
 
-export function range(rng, min, max) {
-  return min + rng() * (max - min);
+export function makeRng(seed) {
+  const next = mulberry32(typeof seed === 'number' ? seed : hashSeed(String(seed)));
+  return {
+    next,
+    range(min, max) {
+      return min + (max - min) * next();
+    },
+    int(min, max) {
+      return Math.floor(min + (max - min + 1) * next());
+    },
+    pick(list) {
+      return list[Math.floor(next() * list.length)];
+    },
+    chance(p) {
+      return next() < p;
+    },
+    sign() {
+      return next() < 0.5 ? -1 : 1;
+    },
+  };
 }
 
-export function pick(rng, list) {
-  return list[Math.floor(rng() * list.length) % list.length];
-}
-
-export function pickInt(rng, min, max) {
-  return min + Math.floor(rng() * (max - min + 1));
-}
-
-// Pilih warna dari palet berdasarkan RNG.
-export function pickColor(rng, palette) {
-  return pick(rng, palette);
-}
-
-// Acak urutan array (Fisher-Yates) memakai RNG yang sama — deterministik.
+// Fisher-Yates shuffle that reuses the same rng stream.
 export function shuffle(rng, list) {
   const out = list.slice();
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
+    const j = Math.floor(rng.next() * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j];
+    out[j] = tmp;
   }
   return out;
 }

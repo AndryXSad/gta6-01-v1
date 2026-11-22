@@ -1,87 +1,118 @@
-// SOLMAR — konstanta kota & gameplay. Satu tempat untuk semua angka yang
-// dipakai modul lain, supaya tuning tidak tersebar di belasan file.
-export const CFG = {
-  // Dunia: kota 560x560 meter, dikelilingi laut di selatan & barat.
-  worldHalf: 280,
-  groundY: 0,
-  // Kecepatan (meter/detik)
-  walkSpeed: 5.2,
-  runSpeed: 9.0,
-  driveAccel: 26,
-  driveTop: 42,
-  driveReverseTop: 12,
-  brake: 34,
-  // Pemain
-  maxHealth: 100,
-  maxArmor: 50,
-  punchRange: 2.4,
-  punchDamage: 18,
-  punchCooldown: 0.45,
-  // Wanted 1..5
-  wantedMax: 5,
-  wantedDecaySeconds: 26,
-  // Polisi
-  policeShootStars: 3,
-  // Kamera third-person
-  camDistance: 11,
-  camHeight: 5.2,
-  camDriveDistance: 14,
-  camDriveHeight: 6.0,
-  // Jam kota: 1 detik nyata = 1 menit kota, mulai 09:40.
-  clockStartMinutes: 9 * 60 + 40,
-  clockRate: 1,
-  // Pickup kembali muncul sekian detik setelah diambil.
-  pickupRespawnSeconds: 20,
-  // Warna kota Solmar: matahari, laut, beton hangat, atap warna-warni.
-  colors: {
-    sky: 0x8ec9ee,
-    fog: 0xa8d4ee,
-    ground: 0x9a9a8e,
-    road: 0x3a3d44,
-    roadLine: 0xf5d76e,
-    sidewalk: 0xb9b3a4,
-    sand: 0xe8d29a,
-    sea: 0x2f7fb8,
-    harbor: 0x6e6a63,
-    grass: 0x7fae62,
-    roofA: 0xd96a4a,
-    roofB: 0x4a90d9,
-    roofC: 0xe8b13c,
-    roofD: 0x7fb069,
-    wallA: 0xf2e6d0,
-    wallB: 0xe3cfa8,
-    wallC: 0xcfd8dc,
-    palm: 0x3f8f4f,
-    trunk: 0x8a6b4a,
-    containerA: 0xc0392b,
-    containerB: 0x2471a3,
-    containerC: 0x229954,
-    containerD: 0xd4ac0d,
-  },
-  // Titik penting kota (x, z). Sumbu z positif = ke arah laut selatan.
-  spots: {
-    plaza: { x: 0, z: -10 },
-    harbor: { x: -190, z: 150 },
-    garage: { x: 120, z: -120 },
-    boulevard: { x: 60, z: 205 },
-    highwayNorth: { x: -40, z: -235 },
-    beach: { x: 190, z: 190 },
-    market: { x: -90, z: -60 },
-    overlook: { x: 150, z: -200 },
-  },
-  // Jalan grid pusat kota: jalan vertikal x = -120,-60,0,60,120 dan
-  // horizontal z = -180,-120,-60,0,60,120,180 (selain itu highway lingkar).
-  gridXs: [-120, -60, 0, 60, 120],
-  gridZs: [-180, -120, -60, 0, 60, 120, 180],
-  roadWidth: 12,
+// Solmar — tuning constants for the whole game.
+// One place for every number a designer would tweak: world size, speeds,
+// wanted escalation, mission rewards, colours. Nothing here touches the DOM.
+export const WORLD = {
+  size: 520,          // playable ground, metres, centred on 0,0
+  roadGap: 46,        // distance between parallel roads
+  roadWidth: 11,
+  blockSize: 35,
+  sidewalk: 2.2,
+  waterAt: -232,      // harbour waterline (south edge, z < waterAt is sea)
+  beachAt: -206,      // sand strip between city and sea
+  highwayRadius: 236, // ring road around the city
 };
 
-// Nama jalan & toko orisinal Solmar (tidak ada nama dari game lain).
-export const STREET_NAMES = [
-  'Jalan Ombak', 'Jalan Kestrel', 'Jalan Pelabuhan', 'Jalan Merdeka Raya',
-  'Jalan Palem', 'Jalan Karang', 'Jalan Senja', 'Jalan Dermaga',
+export const PALETTE = {
+  sky: 0x8ec9ee,
+  fog: 0xa8c8e0,
+  ground: 0x3f7a4e,
+  sand: 0xd9c28a,
+  sea: 0x2a6f9e,
+  road: 0x33363b,
+  roadLine: 0xd8d23a,
+  sidewalk: 0x9aa0a3,
+  building: [0xb08968, 0x8d99ae, 0xc1666b, 0x7fb069, 0xe0a458, 0x6d6875, 0x84a59d],
+  windowLit: 0xffe08a,
+  windowDark: 0x2b3440,
+  lamp: 0xffe9a8,
+  tree: 0x2f6b3a,
+  trunk: 0x6b4a2f,
+  carPlayer: 0xe63946,
+  carPolice: 0x1d3557,
+  carTaxi: 0xf4d35e,
+  beacon: 0xffd60a,
+  hospital: 0xf1faee,
+};
+
+export const PLAYER = {
+  walkSpeed: 7.5,
+  runSpeed: 12,
+  turnSpeed: 9,
+  radius: 0.9,
+  maxHealth: 100,
+  punchDamage: 34,
+  punchRange: 2.4,
+  punchCooldown: 0.45,
+};
+
+export const CAR = {
+  accel: 16,
+  brake: 30,
+  maxSpeed: 34,
+  reverseSpeed: 10,
+  steer: 2.1,
+  grip: 0.94,
+  enterRadius: 4.2,
+};
+
+export const TRAFFIC = {
+  carCount: 14,
+  pedCount: 22,
+  carSpeed: 9,
+  pedSpeed: 2.2,
+};
+
+export const WANTED = {
+  max: 5,
+  decaySeconds: 14,      // seconds unseen before one star drops
+  stealHeat: 1,           // stealing a car adds a star
+  hitPedHeat: 1,
+  ramCopHeat: 1,
+  // patrol cars per wanted level
+  patrols: [0, 1, 2, 3, 4, 5],
+  copShootAt: 3,          // stars at which foot cops open fire
+  shootDamage: 6,
+  shootInterval: 1.1,
+  bustDistance: 2.2,
+  ramDamage: 8,
+};
+
+export const MISSIONS = [
+  {
+    id: 'courier',
+    title: 'Paket Pelabuhan',
+    brief: 'Madame Kestrel: antar paket ini ke dermaga selatan. Jangan berhenti.',
+    target: [12, -196],
+    radius: 9,
+    reward: 250,
+  },
+  {
+    id: 'hotwire',
+    title: 'Mobil Panas',
+    brief: 'Curi mobil apa saja, lalu bawa ke garasi utara. Polisi sudah curiga.',
+    target: [-92, 92],
+    radius: 9,
+    reward: 400,
+    needCar: true,
+  },
+  {
+    id: 'pickup',
+    title: 'Jemput Rekan',
+    brief: 'Jemput Dara di boulevard pantai. Bawa dia pergi sebelum polisi datang.',
+    target: [138, -160],
+    radius: 9,
+    reward: 550,
+  },
+  {
+    id: 'getaway',
+    title: 'Getaway Terakhir',
+    brief: 'Highway lingkar. Hilangkan bintang wanted, lalu sampai ke ujung barat.',
+    target: [-210, 40],
+    radius: 11,
+    reward: 900,
+  },
 ];
-export const SHOP_NAMES = [
-  'Warung Ombak', 'Toko Kestrel', 'Bengkel Surya', 'Kios Pelita',
-  'Pasar Ikan Solmar', 'Kafe Senja', 'Toko Roda Dua', 'Laundry Biru',
-];
+
+export const SAVE_KEY = 'solmar-save-v1';
+export const START_CASH = 120;
+export const BUST_FINE = 150;

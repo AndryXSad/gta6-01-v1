@@ -1,51 +1,78 @@
-// Save Solmar: progres (misi, uang, HP, posisi, wanted) di localStorage.
-// Kunci berversi supaya save lama yang rusak tidak merusak game baru.
-const KEY = 'solmar-save-v1';
+// Solmar save — progress (mission, cash, health, position, wanted) in
+// localStorage under a versioned key, so a corrupt or stale save can never
+// break a fresh game. Everything is validated on load.
+import { SAVE_KEY, START_CASH, PLAYER } from './config.js';
+
+export function defaultSave() {
+  return {
+    version: 1,
+    missionIndex: 0,
+    cash: START_CASH,
+    health: PLAYER.maxHealth,
+    wanted: 0,
+    x: 0,
+    z: 30,
+    heading: 0,
+    completed: [],
+  };
+}
 
 export function loadSave() {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') return null;
-    if (typeof data.missionIndex !== 'number') return null;
-    return data;
-  } catch {
+    if (!data || data.version !== 1) return null;
+    const clean = defaultSave();
+    clean.missionIndex = Number.isInteger(data.missionIndex) ? Math.max(0, data.missionIndex) : 0;
+    clean.cash = Number.isFinite(data.cash) ? Math.max(0, Math.floor(data.cash)) : START_CASH;
+    clean.health = Number.isFinite(data.health)
+      ? Math.max(1, Math.min(PLAYER.maxHealth, data.health))
+      : PLAYER.maxHealth;
+    clean.wanted = Number.isInteger(data.wanted) ? Math.max(0, Math.min(5, data.wanted)) : 0;
+    clean.x = Number.isFinite(data.x) ? data.x : 0;
+    clean.z = Number.isFinite(data.z) ? data.z : 30;
+    clean.heading = Number.isFinite(data.heading) ? data.heading : 0;
+    clean.completed = Array.isArray(data.completed) ? data.completed.filter((m) => typeof m === 'string') : [];
+    return clean;
+  } catch (e) {
     return null;
   }
 }
 
-export function saveGame(state) {
+export function storeSave(state) {
   try {
     const data = {
-      missionIndex: state.missions.index,
-      money: state.player.money,
-      health: Math.round(state.player.health),
-      armor: Math.round(state.player.armor),
-      x: Math.round(state.player.pos.x * 10) / 10,
-      z: Math.round(state.player.pos.z * 10) / 10,
-      stars: state.police.stars,
-      completed: state.missions.completedCount,
-      savedAt: new Date().toISOString(),
+      version: 1,
+      missionIndex: state.missionIndex,
+      cash: Math.floor(state.cash),
+      health: Math.round(state.health),
+      wanted: state.wanted,
+      x: Math.round(state.x * 10) / 10,
+      z: Math.round(state.z * 10) / 10,
+      heading: Math.round(state.heading * 100) / 100,
+      completed: state.completed.slice(),
     };
-    window.localStorage.setItem(KEY, JSON.stringify(data));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     return true;
-  } catch {
+  } catch (e) {
     return false;
   }
 }
 
 export function clearSave() {
-  try { window.localStorage.removeItem(KEY); } catch { /* abaikan */ }
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) {}
 }
 
 export function hasSave() {
   return loadSave() !== null;
 }
 
-// Ringkasan save untuk menu (dipakai main.js saat boot).
-export function saveSummary() {
-  const s = loadSave();
-  if (!s) return null;
-  return `Misi ${s.missionIndex + 1}/4 · $${s.money} · HP ${s.health}`;
+// One-line summary for the start screen ("Continue — Misi 2, $370").
+export function saveSummary(save) {
+  if (!save) return '';
+  const done = save.completed.length;
+  return `Misi ${save.missionIndex + 1} dari 4 · ${done} selesai · $${save.cash}`;
 }
